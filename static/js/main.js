@@ -48,10 +48,7 @@ document.getElementById("switchVocal").addEventListener('click', () => {
         send_message(4, 0);
     }
 })
-document.getElementById("guzhang").addEventListener('click', () => {send_message(7, 'guzhang');})
-document.getElementById("huanhu").addEventListener('click', () => {send_message(7, 'huanhu');})
-document.getElementById("daxiao").addEventListener('click', () => {send_message(7, 'daxiao');})
-document.getElementById("xixu").addEventListener('click', () => {send_message(7, 'xixu');})
+
 document.getElementById("search-text").addEventListener('input', () =>{
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
@@ -145,8 +142,7 @@ getSingList = () => {
                     s = s + `<div class="song-list"><div>${item.name}</div><a onclick="set_top(${item.id})">置顶</a><a onclick="delete_from_list(${item.id})">删除</a></div>`
                 })
                 document.getElementsByClassName("added-container")[0].innerHTML = s;
-                document.getElementById("added-song-num").innerText = data.total;
-                document.getElementById("added-song-num1").innerText = data.total;
+                updateSongCount(data.total);
             } else {
                 console.log(data.msg);
             }
@@ -282,3 +278,55 @@ window.onload = function() {
     };
     getSingList();
 };
+
+// 新的导航功能
+function showSection(sectionId) {
+    // 隐藏所有内容区域
+    const sections = document.querySelectorAll('.content-section');
+    sections.forEach(section => {
+        section.classList.remove('active');
+    });
+    
+    // 显示选中的区域
+    const targetSection = document.getElementById(sectionId);
+    if (targetSection) {
+        targetSection.classList.add('active');
+    }
+    
+    // 更新导航按钮状态
+    const navButtons = document.querySelectorAll('.nav-btn');
+    navButtons.forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // 设置当前按钮为活跃状态
+    const activeButton = document.querySelector(`[onclick="showSection('${sectionId}')"]`);
+    if (activeButton) {
+        activeButton.classList.add('active');
+    }
+    
+    // 如果是点歌区域，显示搜索框
+    const searchSection = document.getElementById('search-section');
+    if (sectionId === 'song-selection') {
+        searchSection.style.display = 'block';
+    } else {
+        searchSection.style.display = 'none';
+    }
+}
+
+// 更新歌曲数量显示
+function updateSongCount(count) {
+    const badge = document.getElementById('added-song-num');
+    const countSpan = document.getElementById('added-song-num1');
+    
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'block';
+    } else {
+        badge.style.display = 'none';
+    }
+    
+    if (countSpan) {
+        countSpan.textContent = count;
+    }
+}

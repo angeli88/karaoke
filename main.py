@@ -86,4 +86,4 @@ if __name__ == "__main__":
     local_ip = settings.get_config('host')
     if not local_ip:
         local_ip = get_local_ip()
-    uvicorn.run(app="main:app", host=local_ip, port=int(settings.get_config('port')), reload=False)
+    uvicorn.run(app="main:app", host=local_ip, port=int(settings.get_config('port')), reload=True)

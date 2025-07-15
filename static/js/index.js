@@ -106,12 +106,12 @@ function get_song_list(page=1) {
                     return;
                 }
                 data.data.forEach(item => {
-                    s = s + `<tr><td>${item.name}</td><td>${item.create_time}</td>
+                    s = s + `<tr><td>${item.name}</td>
                             <td><a onclick="sing_song(${item.id})">点歌</a><a onclick="delete_song(${item.id})">删除</a></td></tr>`;
                 })
                 PagingManage($('#paging'), data.totalPage, data.page);
                 document.getElementsByTagName("table")[0].style.display = "";
-                document.getElementById("create-time").style.display = "";
+                // document.getElementById("create-time").style.display = "";
                 document.getElementsByTagName("tbody")[0].innerHTML = s;
             } else {
                 $.Toast(data.msg, 'error');
@@ -132,11 +132,11 @@ function get_history_list(queryType) {
                     return;
                 }
                 data.data.forEach(item => {
-                    s = s + `<tr><td>${item.name}</td><td><a onclick="sing_song(${item.id})">点歌</a><a onclick="delete_from_list(${item.id})">删除</a></td></tr>`;
+                    s = s + `<tr><td>${item.name}</td><td><a onclick="sing_song(${item.id})">点歌</a></td></tr>`;
                 })
                 PagingManage($('#paging'), data.totalPage, data.page);
                 document.getElementsByTagName("table")[0].style.display = "";
-                document.getElementById("create-time").style.display = "none";
+                // document.getElementById("create-time").style.display = "none";
                 document.getElementsByTagName("tbody")[0].innerHTML = s;
             } else {
                 $.Toast(data.msg, 'error');

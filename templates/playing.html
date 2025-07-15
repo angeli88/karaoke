@@ -7,10 +7,20 @@
     <link rel="stylesheet" href="/static/css/ktv.css">
     <link rel="stylesheet" href="/static/css/toast.style.css">
     <script type="text/javascript" src="/static/js/jq.min.js"></script>
+    <script type="text/javascript" src="/static/js/qrcode.min.js"></script>
     <script type="text/javascript" src="/static/js/toast.script.js"></script>
 </head>
 <body>
 <div class="top-tips"><div style="text-align: center;" id="playing-text"></div></div>
+
+<!-- 固定二维码区域 -->
+<div class="qr-code-fixed" id="qr-code-fixed">
+    <div class="qr-code-container">
+        <div class="qr-code-title">扫码点歌</div>
+        <div id="qr-code-display"></div>
+    </div>
+</div>
+
 <div class="video-container">
     <video id="myVideo" controls preload="auto">
         <source src="" type="video/mp4">
@@ -29,6 +39,7 @@
         你的浏览器不支持音频标签。
     </audio>
 </div>
+
 <div class="setting">
     <div class="setting-img"><img id="expand-img" src="/static/img/expand.svg" alt="expand.svg"></div>
     <div class="setting-list">

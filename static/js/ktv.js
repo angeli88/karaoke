@@ -13,6 +13,22 @@ let openSetting = false;
 let singsList = [];
 let isBindEvent = false;
 
+// 遥控器控制相关变量
+let isRemoteControlVisible = false;
+let currentFocusIndex = 0;
+let controlItems = [];
+
+// 遥控器按键映射
+const REMOTE_KEYS = {
+    ENTER: 13,      // 确认键
+    UP: 38,         // 上
+    DOWN: 40,       // 下
+    LEFT: 37,       // 左
+    RIGHT: 39,      // 右
+    BACK: 8,        // 返回键
+    MENU: 18        // 菜单键 (Alt)
+};
+
 localStorage.setItem('vocalsVolume', vocalsVolume.toString());
 localStorage.setItem('accompanimentVolume', accompanimentVolume.toString());
 video.volume = 0;
@@ -329,6 +345,8 @@ document.getElementById("change-volume").addEventListener("click", () => {
 
 window.onload = function() {
     loadSing();
+    initRemoteControl();
+    generateQRCode();
 
     const eventSource = new EventSource(server + "/song/events");
     eventSource.onmessage = function(event) {
@@ -369,3 +387,246 @@ window.onload = function() {
         eventSource.close();
     };
 };
+
+// 初始化遥控器控制
+function initRemoteControl() {
+    controlItems = document.querySelectorAll('.control-item');
+    
+    // 绑定键盘事件
+    document.addEventListener('keydown', handleRemoteKeyPress);
+    
+    // 初始化音量显示
+    updateVolumeIndicators();
+    
+    // 更新播放状态显示
+    updatePlayPauseText();
+}
+
+// 处理遥控器按键
+function handleRemoteKeyPress(e) {
+    e.preventDefault();
+    
+    switch(e.keyCode) {
+        case REMOTE_KEYS.ENTER:
+            if (isRemoteControlVisible) {
+                executeCurrentAction();
+            } else {
+                showRemoteControl();
+            }
+            break;
+        case REMOTE_KEYS.UP:
+            if (isRemoteControlVisible) {
+                moveFocusVertical(-1);
+            }
+            break;
+        case REMOTE_KEYS.DOWN:
+            if (isRemoteControlVisible) {
+                moveFocusVertical(1);
+            }
+            break;
+        case REMOTE_KEYS.LEFT:
+            if (isRemoteControlVisible) {
+                moveFocusHorizontal(-1);
+            }
+            break;
+        case REMOTE_KEYS.RIGHT:
+            if (isRemoteControlVisible) {
+                moveFocusHorizontal(1);
+            }
+            break;
+        case REMOTE_KEYS.BACK:
+            if (isRemoteControlVisible) {
+                hideRemoteControl();
+            }
+            break;
+    }
+}
+
+// 显示遥控器控制面板
+function showRemoteControl() {
+    isRemoteControlVisible = true;
+    document.getElementById('remote-control-panel').classList.add('show');
+    updateFocus();
+}
+
+// 隐藏遥控器控制面板
+function hideRemoteControl() {
+    isRemoteControlVisible = false;
+    document.getElementById('remote-control-panel').classList.remove('show');
+}
+
+// 水平移动焦点
+function moveFocusHorizontal(direction) {
+    currentFocusIndex += direction;
+    if (currentFocusIndex < 0) {
+        currentFocusIndex = controlItems.length - 1;
+    } else if (currentFocusIndex >= controlItems.length) {
+        currentFocusIndex = 0;
+    }
+    updateFocus();
+}
+
+// 垂直移动焦点
+function moveFocusVertical(direction) {
+    const itemsPerRow = getItemsPerRow();
+    const currentRow = Math.floor(currentFocusIndex / itemsPerRow);
+    const currentCol = currentFocusIndex % itemsPerRow;
+    
+    let newRow = currentRow + direction;
+    const totalRows = Math.ceil(controlItems.length / itemsPerRow);
+    
+    if (newRow < 0) {
+        newRow = totalRows - 1;
+    } else if (newRow >= totalRows) {
+        newRow = 0;
+    }
+    
+    let newIndex = newRow * itemsPerRow + currentCol;
+    if (newIndex >= controlItems.length) {
+        newIndex = controlItems.length - 1;
+    }
+    
+    currentFocusIndex = newIndex;
+    updateFocus();
+}
+
+// 获取每行控制项数量
+function getItemsPerRow() {
+    const screenWidth = window.innerWidth;
+    if (screenWidth > 1200) return 5;
+    if (screenWidth > 800) return 4;
+    if (screenWidth > 600) return 3;
+    return 2;
+}
+
+// 更新焦点显示
+function updateFocus() {
+    controlItems.forEach((item, index) => {
+        if (index === currentFocusIndex) {
+            item.classList.add('focused');
+        } else {
+            item.classList.remove('focused');
+        }
+    });
+}
+
+// 执行当前选中的操作
+function executeCurrentAction() {
+    const currentItem = controlItems[currentFocusIndex];
+    const action = currentItem.getAttribute('data-action');
+    
+    switch(action) {
+        case 'play-pause':
+            togglePlayPause();
+            break;
+        case 're-sing':
+            reSing();
+            break;
+        case 'next-song':
+            send_message(3, 0);
+            break;
+        case 'vocal-switch':
+            toggleVocalSwitch();
+            break;
+        case 'volume-vocal':
+            adjustVolume('vocals', 0.1);
+            break;
+        case 'volume-acc':
+            adjustVolume('accompaniment', 0.1);
+            break;
+        case 'effect-applause':
+            userInterruption('guzhang');
+            break;
+        case 'effect-cheer':
+            userInterruption('huanhu');
+            break;
+        case 'effect-laugh':
+            userInterruption('daxiao');
+            break;
+        case 'effect-sigh':
+            userInterruption('xixu');
+            break;
+    }
+}
+
+// 切换播放/暂停
+function togglePlayPause() {
+    if (video.paused) {
+        video.play();
+    } else {
+        video.pause();
+    }
+}
+
+// 切换原唱/伴奏
+function toggleVocalSwitch() {
+    const switch_button = document.getElementById("switchVocal");
+    if (switch_button.getElementsByTagName('span')[0].innerText === "原唱") {
+        send_message(4, 1);
+    } else {
+        send_message(4, 0);
+    }
+}
+
+// 调整音量
+function adjustVolume(type, step) {
+    if (type === 'vocals') {
+        vocalsVolume = Math.max(0, Math.min(1, vocalsVolume + step));
+        vocals.volume = vocalsVolume;
+        localStorage.setItem('vocalsVolume', vocalsVolume.toString());
+        send_message(5, vocalsVolume);
+    } else {
+        accompanimentVolume = Math.max(0, Math.min(1, accompanimentVolume + step));
+        accompaniment.volume = accompanimentVolume;
+        localStorage.setItem('accompanimentVolume', accompanimentVolume.toString());
+        send_message(6, accompanimentVolume);
+    }
+    updateVolumeIndicators();
+}
+
+// 更新音量指示器
+function updateVolumeIndicators() {
+    const vocalIndicator = document.getElementById('vocal-volume-indicator');
+    const accIndicator = document.getElementById('acc-volume-indicator');
+    
+    if (vocalIndicator) {
+        vocalIndicator.textContent = Math.round(vocalsVolume * 100) + '%';
+    }
+    if (accIndicator) {
+        accIndicator.textContent = Math.round(accompanimentVolume * 100) + '%';
+    }
+}
+
+// 更新播放/暂停按钮文本
+function updatePlayPauseText() {
+    const playPauseText = document.getElementById('play-pause-text');
+    if (playPauseText) {
+        playPauseText.textContent = video.paused ? '播放' : '暂停';
+    }
+}
+
+// 生成二维码
+function generateQRCode() {
+    const qrCodeElement = document.getElementById('qr-code-display');
+    if (qrCodeElement && typeof QRCode !== 'undefined') {
+        const currentUrl = window.location.origin + "/song";
+        
+        new QRCode(qrCodeElement, {
+            text: currentUrl,
+            width: 120,
+            height: 120,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    }
+}
+
+// 监听视频播放状态变化
+video.addEventListener('play', function() {
+    updatePlayPauseText();
+});
+
+video.addEventListener('pause', function() {
+    updatePlayPauseText();
+});
