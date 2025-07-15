@@ -60,8 +60,8 @@ document.getElementById("search-text").addEventListener('input', () =>{
             success: function (data) {
                 if (data.code === 0) {
                     let s = "";
-                    data.data.forEach(item => {
-                        s = s + `<div class="song-list"><div>${item.name}</div><a onclick="sing_song(${item.id})">点歌</a></div>`
+                    data.data.forEach((item, index) => {
+                        s = s + `<div class="song-list"><div>${index + 1}. ${item.name}</div><a onclick="sing_song(${item.id})">点歌</a></div>`
                     })
                     document.getElementsByClassName("song-container")[0].innerHTML = s;
                 }
@@ -138,8 +138,8 @@ getSingList = () => {
                     stopRotate();
                 }
                 let s = "";
-                data.data.forEach(item => {
-                    s = s + `<div class="song-list"><div>${item.name}</div><a onclick="set_top(${item.id})">置顶</a><a onclick="delete_from_list(${item.id})">删除</a></div>`
+                data.data.forEach((item, index) => {
+                    s = s + `<div class="song-list"><div>${index + 1}. ${item.name}</div><a onclick="set_top(${item.id})">置顶</a><a onclick="delete_from_list(${item.id})">删除</a></div>`
                 })
                 document.getElementsByClassName("added-container")[0].innerHTML = s;
                 updateSongCount(data.total);

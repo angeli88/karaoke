@@ -452,6 +452,51 @@ div.lazy.img {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.3s ease, visibility 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 已点歌曲区域特殊处理 */
+#added-songs {
+  padding: 0;
+}
+
+#added-songs .section-header {
+  position: sticky;
+  top: 0;
+  background: var(--card-bg);
+  z-index: 10;
+  margin: 0;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+#added-songs .added-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 1rem 90px 1rem; /* 底部增加90px padding，避免被底部导航栏遮挡 */
+}
+
+/* 点歌区域特殊处理 */
+#song-selection {
+  padding: 0;
+}
+
+#song-selection .section-header {
+  position: sticky;
+  top: 0;
+  background: var(--card-bg);
+  z-index: 10;
+  margin: 0;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+#song-selection .song-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 1rem 90px 1rem; /* 底部增加90px padding，避免被底部导航栏遮挡 */
+  margin: 0; /* 重置原有margin */
 }
 
 .content-section.active {
