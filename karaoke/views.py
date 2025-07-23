@@ -67,8 +67,8 @@ async def get_list(q: str, page: int) -> Result:
     result = Result()
     try:
         if q:
-            files = await Files.filter(name__contains=q).order_by('-id').offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
-            total_num = await Files.filter(name__contains=q).count()
+            files = await Files.filter(name__icontains=q).order_by('-id').offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
+            total_num = await Files.filter(name__icontains=q).count()
         else:
             files = await Files.all().order_by('-id').offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
             total_num = await Files.all().count()
