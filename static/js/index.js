@@ -1,5 +1,6 @@
 const server = localStorage.getItem("server");
 let songListTimeout = null;
+let currentPage = 1; // 记录当前页面
 document.getElementById("file-upload").addEventListener('click', () => {
     let fileUpload_input = document.getElementById("file-input");
     fileUpload_input.click();
@@ -90,6 +91,7 @@ document.getElementById("generate_code").addEventListener('click', () => {
 })
 
 function get_song_list(page=1) {
+    currentPage = page; // 更新当前页面
     let q = document.getElementById("file-search").value;
     let params = "page=" + page;
     if (q && q !== "" && q !== null) {
@@ -152,7 +154,24 @@ function delete_song(file_id) {
         success: function (data) {
             if (data.code === 0) {
                 $.Toast(data.msg, "success");
-                get_song_list();
+                // 删除后刷新当前页面，如果当前页面没有数据了则回到上一页
+                $.ajax({
+                    type: "GET",
+                    url: server + "/song/list?page=" + currentPage + (document.getElementById("file-search").value ? "&q=" + document.getElementById("file-search").value : ""),
+                    success: function (checkData) {
+                        if (checkData.code === 0 && checkData.total === 0 && currentPage > 1) {
+                            // 当前页面没有数据了，回到上一页
+                            get_song_list(currentPage - 1);
+                        } else {
+                            // 刷新当前页面
+                            get_song_list(currentPage);
+                        }
+                    },
+                    error: function() {
+                        // 出错时刷新当前页面
+                        get_song_list(currentPage);
+                    }
+                });
                 get_added_songs();
             } else {
                 $.Toast(data.msg, "error");
