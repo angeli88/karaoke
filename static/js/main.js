@@ -74,7 +74,7 @@ function loadSongList(page = 1, keyword = '', append = false) {
                 let s = "";
                 data.data.forEach((item, index) => {
                     let displayIndex = append ? ((page - 1) * 20 + index + 1) : (index + 1);
-                    s += `<div class="song-list"><div>${displayIndex}. ${item.name}</div><a onclick="sing_song(${item.id})">点歌</a></div>`;
+                    s += `<div class="song-list"><div>${displayIndex}. ${item.name}</div><a style="font-size: 75%;" onclick="sing_song(${item.id})">点歌</a></div>`;
                 });
                 
                 if (append) {
@@ -85,6 +85,7 @@ function loadSongList(page = 1, keyword = '', append = false) {
                 
                 // 更新分页状态
                 hasMoreSongs = page < data.totalPage;
+                console.log(hasMoreSongs);
                 currentPage = page;
             } else {
                 console.log(data.msg);
@@ -113,7 +114,7 @@ document.getElementById("search-text").addEventListener('input', () =>{
         // 搜索模式
         isSearchMode = true;
         currentPage = 1;
-        hasMoreSongs = false; // 搜索结果不支持翻页
+        hasMoreSongs = true; // 搜索结果不支持翻页
         loadSongList(1, keyWord);
     }, 500);
 });
@@ -124,7 +125,7 @@ function setupScrollLoading() {
     if (!songContainer) return;
     
     songContainer.addEventListener('scroll', () => {
-        if (isLoading || !hasMoreSongs || isSearchMode) return;
+        if (isLoading || !hasMoreSongs) return; // 移除了 isSearchMode 条件
         
         const scrollTop = songContainer.scrollTop;
         const scrollHeight = songContainer.scrollHeight;
@@ -132,7 +133,13 @@ function setupScrollLoading() {
         
         // 当滚动到底部附近时加载更多
         if (scrollTop + clientHeight >= scrollHeight - 100) {
-            loadSongList(currentPage + 1, '', true);
+            // 根据是否为搜索模式传递不同参数
+            if (isSearchMode) {
+                let keyWord = document.getElementById("search-text").value;
+                loadSongList(currentPage + 1, keyWord, true);
+            } else {
+                loadSongList(currentPage + 1, '', true);
+            }
         }
     });
 }

@@ -152,13 +152,16 @@ div.lazy.img {
   flex-direction: row;
   justify-content: space-around;
   font-size: var(--fsh5);
-  margin: 0.3rem 0;
+  /* margin: 0.3rem 0; */
+  border-bottom: 0.5px solid hsl(205deg, 18%, 86%);
+  border-top: 0.5px solid hsl(205deg, 18%, 86%);
 }
 .song-container>.song-list>div {
   width: calc(100% - 5rem);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  /* font-size: 75%; */
 }
 .added-container {
   display: flex;
@@ -171,13 +174,16 @@ div.lazy.img {
   flex-direction: row;
   justify-content: space-around;
   font-size: var(--fsh5);
-  margin: 0.3rem 0;
+  /* margin: 0.3rem 0; */
+  border-bottom: 0.5px solid hsl(205deg, 18%, 86%);
+  border-top: 0.5px solid hsl(205deg, 18%, 86%);
 }
 .added-container>.song-list>div {
   width: calc(100% - 8rem);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  /* font-size: 75%; */
 }
 @supports ((-webkit-backdrop-filter: blur(var(--blur-px))) or (backdrop-filter: blur(var(--blur-px)))) {
   .widgets {
