@@ -109,7 +109,7 @@ function get_song_list(page=1) {
                 }
                 data.data.forEach(item => {
                     s = s + `<tr><td>${item.name}</td>
-                            <td><a onclick="sing_song(${item.id})">点歌</a><a onclick="rename_song(${item.id}, '${item.name}')">重命名</a><a onclick="delete_song(${item.id})">删除</a></td></tr>`;
+                            <td><a onclick="sing_song(${item.id})">点歌</a><a onclick="rename_song(${item.id}, '${item.name}')">重命名</a><a onclick="delete_song(${item.id}, '${item.name}')">删除</a></td></tr>`;
                 })
                 PagingManage($('#paging'), data.totalPage, data.page);
                 document.getElementsByTagName("table")[0].style.display = "";
@@ -147,8 +147,8 @@ function get_history_list(queryType) {
     })
 }
 
-function delete_song(file_id) {
-    if (confirm("确定要删除这首歌曲吗？")) {
+function delete_song(file_id, name) {
+    if (confirm("确定要删除歌曲" + name + "吗？")) {
         $.ajax({
             type: "GET",
             url: server + "/song/delete/" + file_id,
