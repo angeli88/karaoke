@@ -109,7 +109,7 @@ function get_song_list(page=1) {
                 }
                 data.data.forEach(item => {
                     s = s + `<tr><td>${item.name}</td>
-                            <td><a onclick="sing_song(${item.id})">点歌</a><a onclick="delete_song(${item.id})">删除</a></td></tr>`;
+                            <td><a onclick="sing_song(${item.id})">点歌</a><a onclick="rename_song(${item.id}, '${item.name}')">重命名</a><a onclick="delete_song(${item.id})">删除</a></td></tr>`;
                 })
                 PagingManage($('#paging'), data.totalPage, data.page);
                 document.getElementsByTagName("table")[0].style.display = "";
@@ -148,36 +148,38 @@ function get_history_list(queryType) {
 }
 
 function delete_song(file_id) {
-    $.ajax({
-        type: "GET",
-        url: server + "/song/delete/" + file_id,
-        success: function (data) {
-            if (data.code === 0) {
-                $.Toast(data.msg, "success");
-                // 删除后刷新当前页面，如果当前页面没有数据了则回到上一页
-                $.ajax({
-                    type: "GET",
-                    url: server + "/song/list?page=" + currentPage + (document.getElementById("file-search").value ? "&q=" + document.getElementById("file-search").value : ""),
-                    success: function (checkData) {
-                        if (checkData.code === 0 && checkData.total === 0 && currentPage > 1) {
-                            // 当前页面没有数据了，回到上一页
-                            get_song_list(currentPage - 1);
-                        } else {
-                            // 刷新当前页面
+    if (confirm("确定要删除这首歌曲吗？")) {
+        $.ajax({
+            type: "GET",
+            url: server + "/song/delete/" + file_id,
+            success: function (data) {
+                if (data.code === 0) {
+                    $.Toast(data.msg, "success");
+                    // 删除后刷新当前页面，如果当前页面没有数据了则回到上一页
+                    $.ajax({
+                        type: "GET",
+                        url: server + "/song/list?page=" + currentPage + (document.getElementById("file-search").value ? "&q=" + document.getElementById("file-search").value : ""),
+                        success: function (checkData) {
+                            if (checkData.code === 0 && checkData.total === 0 && currentPage > 1) {
+                                // 当前页面没有数据了，回到上一页
+                                get_song_list(currentPage - 1);
+                            } else {
+                                // 刷新当前页面
+                                get_song_list(currentPage);
+                            }
+                        },
+                        error: function() {
+                            // 出错时刷新当前页面
                             get_song_list(currentPage);
                         }
-                    },
-                    error: function() {
-                        // 出错时刷新当前页面
-                        get_song_list(currentPage);
-                    }
-                });
-                get_added_songs();
-            } else {
-                $.Toast(data.msg, "error");
+                    });
+                    get_added_songs();
+                } else {
+                    $.Toast(data.msg, "error");
+                }
             }
-        }
-    })
+        });
+    }
 }
 
 function sing_song(file_id) {
@@ -235,3 +237,22 @@ window.onload = function() {
     get_song_list();
     setTimeout(() => {get_added_songs();}, 500);
 };
+
+
+function rename_song(id, oldName) {
+    let newName = prompt("请输入新的歌曲名称:", oldName);
+    if (newName && newName !== oldName) {
+        $.ajax({
+            type: "GET",
+            url: server + "/song/rename/" + id + "/" + encodeURIComponent(newName),
+            success: function (data) {
+                if (data.code === 0) {
+                    $.Toast(data.msg, "success");
+                    get_song_list(currentPage);
+                } else {
+                    $.Toast(data.msg, "error");
+                }
+            }
+        });
+    }
+}

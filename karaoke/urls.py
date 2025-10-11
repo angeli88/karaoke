@@ -125,6 +125,10 @@ async def send_event(code: int, data, request: Request):
         await client.put(data)
     return Result()
 
+@router.get("/rename/{file_id}/{new_name}", summary="重命名歌曲")
+async def rename_song(file_id: int, new_name: str):
+    result = await views.rename_song(file_id, new_name)
+    return result
 
 # SSE功能对应的消息格式为 {"code": 0, "data": 1}
 # code = 0: 无实际含义，可用于心跳检测

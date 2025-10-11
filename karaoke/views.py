@@ -329,3 +329,47 @@ async def convert_audio(file_name: str) -> Result:
         result.code = 1
         result.msg = "系统错误"
     return result
+
+
+async def rename_song(file_id: int, new_name: str) -> Result:
+    result = Result()
+    try:
+        file = await Files.get(id=file_id)
+        old_name = file.name
+        
+        # 检查新名称是否已存在
+        if old_name != new_name:
+            existing_file = await Files.filter(name=new_name).first()
+            if existing_file:
+                result.code = 1
+                result.msg = f"歌曲名称 {new_name} 已存在，请使用其他名称"
+                logger.warning(result.msg)
+                return result
+                
+        # 重命名文件
+        if os.path.exists(f"{FILE_PATH}/{old_name}.mp4"):
+            os.rename(f"{FILE_PATH}/{old_name}.mp4", f"{FILE_PATH}/{new_name}.mp4")
+        if os.path.exists(f"{FILE_PATH}/{old_name}_vocals.mp3"):
+            os.rename(f"{FILE_PATH}/{old_name}_vocals.mp3", f"{FILE_PATH}/{new_name}_vocals.mp3")
+        if os.path.exists(f"{FILE_PATH}/{old_name}_accompaniment.mp3"):
+            os.rename(f"{FILE_PATH}/{old_name}_accompaniment.mp3", f"{FILE_PATH}/{new_name}_accompaniment.mp3")
+        
+        # 更新数据库记录
+        file.name = new_name
+        await file.save()
+        
+        # 如果存在历史记录，也需要更新
+        try:
+            history = await History.get(id=file_id)
+            history.name = new_name
+            await history.save()
+        except DoesNotExist:
+            pass
+            
+        result.msg = f"歌曲 {old_name} 重命名为 {new_name} 成功"
+        logger.info(result.msg)
+    except:
+        logger.error(traceback.format_exc())
+        result.code = 1
+        result.msg = "系统错误"
+    return result
