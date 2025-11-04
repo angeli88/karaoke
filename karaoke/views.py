@@ -85,23 +85,25 @@ async def get_list(q: str, page: int) -> Result:
     return result
 
 
-async def delete_song(file_id: int) -> Result:
+async def delete_song(file_id: str) -> Result:
     result = Result()
     try:
-        file = await Files.get(id=file_id)
-        if os.path.exists(f"{FILE_PATH}/{file.name}.mp4"):
-            os.remove(f"{FILE_PATH}/{file.name}.mp4")
-        if os.path.exists(f"{FILE_PATH}/{file.name}_vocals.mp3"):
-            os.remove(f'{FILE_PATH}/{file.name}_vocals.mp3')
-        if os.path.exists(f"{FILE_PATH}/{file.name}_accompaniment.mp3"):
-            os.remove(f'{FILE_PATH}/{file.name}_accompaniment.mp3')
-        try:
-            history = await History.get(id=file_id)
-            await history.delete()
-        except DoesNotExist:
-            pass
-        await file.delete()
-        result.msg = f"{file.name} 删除成功"
+        ids = [int(i) for i in file_id.split(',')]
+        for i in ids:
+            file = await Files.get(id=i)
+            if os.path.exists(f"{FILE_PATH}/{file.name}.mp4"):
+                os.remove(f"{FILE_PATH}/{file.name}.mp4")
+            if os.path.exists(f"{FILE_PATH}/{file.name}_vocals.mp3"):
+                os.remove(f'{FILE_PATH}/{file.name}_vocals.mp3')
+            if os.path.exists(f"{FILE_PATH}/{file.name}_accompaniment.mp3"):
+                os.remove(f'{FILE_PATH}/{file.name}_accompaniment.mp3')
+            try:
+                history = await History.get(id=i)
+                await history.delete()
+            except DoesNotExist:
+                pass
+            await file.delete()
+        result.msg = f"删除成功"
         logger.info(result.msg)
     except:
         logger.error(traceback.format_exc())

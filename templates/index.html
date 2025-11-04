@@ -27,13 +27,15 @@
             <a href="#" onclick="get_history_list('history')" style="">K歌历史</a>
             <a href="#" onclick="get_history_list('usually')" style="">常点的歌</a>
             <a href="{{ prefix }}/song" target="_blank" style="">控制台(已点<span id="addSongs">0</span>)</a>
+            <a href="#" id="batch-delete" style="display: none;">批量删除</a>
         </div>
     </div>
     <div style="margin-top: 3rem;">
         <table style="display: none;">
             <thead>
                 <tr>
-                    <th style="width: 60%;">名称</th>
+                    <th style="width: 5%;"><input type="checkbox" id="select-all"></th>
+                    <th style="width: 55%;">名称</th>
                     <!-- <th style="width: 30%;" id="create-time">创建时间</th> -->
                     <th style="width: 15%;">操作</th>
                 </tr>

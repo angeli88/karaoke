@@ -33,7 +33,7 @@ async def song_list(q: str = "", page: int = 1):
 
 
 @router.get("/delete/{file_id}", summary="删除歌曲")
-async def delete_song(file_id: int):
+async def delete_song(file_id: str):
     result = await views.delete_song(file_id)
     return result
 

@@ -108,13 +108,42 @@ function get_song_list(page=1) {
                     return;
                 }
                 data.data.forEach(item => {
-                    s = s + `<tr><td>${item.name}</td>
+                    s = s + `<tr><td><input type="checkbox" class="song-checkbox" value="${item.id}"></td>
+                            <td>${item.name}</td>
                             <td><a onclick="sing_song(${item.id})">点歌</a><a onclick="rename_song(${item.id}, '${item.name}')">重命名</a><a onclick="delete_song(${item.id}, '${item.name}')">删除</a></td></tr>`;
                 })
                 PagingManage($('#paging'), data.totalPage, data.page);
                 document.getElementsByTagName("table")[0].style.display = "";
                 // document.getElementById("create-time").style.display = "";
                 document.getElementsByTagName("tbody")[0].innerHTML = s;
+                document.getElementById("batch-delete").style.display = "inline-block";
+
+                document.getElementById('select-all').onchange = function() {
+                    let checkboxes = document.getElementsByClassName('song-checkbox');
+                    for(let i=0; i<checkboxes.length; i++) {
+                        checkboxes[i].checked = this.checked;
+                    }
+                };
+
+                document.getElementById('batch-delete').onclick = function() {
+                    let checkboxes = document.getElementsByClassName('song-checkbox');
+                    let selected_ids = [];
+                    for(let i=0; i<checkboxes.length; i++) {
+                        if(checkboxes[i].checked) {
+                            selected_ids.push(checkboxes[i].value);
+                        }
+                    }
+                    if(selected_ids.length > 0) {
+                        if(confirm(`确定要删除选中的 ${selected_ids.length} 首歌曲吗？`)) {
+                            delete_song(selected_ids.join(','), null, true); // 批量删除，直接执行
+                            // 清除全选框的选中状态
+                            document.getElementById('select-all').checked = false;
+                        }
+                    } else {
+                        $.Toast("请先选择要删除的歌曲", "warning");
+                    }
+                }
+
             } else {
                 $.Toast(data.msg, 'error');
             }
@@ -147,8 +176,8 @@ function get_history_list(queryType) {
     })
 }
 
-function delete_song(file_id, name) {
-    if (confirm("确定要删除歌曲" + name + "吗？")) {
+function delete_song(file_id, file_name, batch = false) {
+    const perform_delete = () => {
         $.ajax({
             type: "GET",
             url: server + "/song/delete/" + file_id,
@@ -178,7 +207,15 @@ function delete_song(file_id, name) {
                     $.Toast(data.msg, "error");
                 }
             }
-        });
+        })
+    }
+
+    if (batch) {
+        perform_delete();
+    } else {
+        if (confirm(`确定要删除歌曲 ${file_name} 吗？`)) {
+            perform_delete();
+        }
     }
 }
 
