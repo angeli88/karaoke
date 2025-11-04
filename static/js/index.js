@@ -160,10 +160,11 @@ function get_history_list(queryType) {
             if (data.code === 0) {
                 if (data.total === 0) {
                     $.Toast("没有歌曲", "error");
+                    document.getElementsByTagName("tbody")[0].innerHTML = '';
                     return;
                 }
                 data.data.forEach(item => {
-                    s = s + `<tr><td>${item.name}</td><td><a onclick="sing_song(${item.id})">点歌</a></td></tr>`;
+                    s = s + `<tr><td></td><td>${item.name}</td><td><a onclick="sing_song(${item.id})">点歌</a></td></tr>`;
                 })
                 PagingManage($('#paging'), data.totalPage, data.page);
                 document.getElementsByTagName("table")[0].style.display = "";
