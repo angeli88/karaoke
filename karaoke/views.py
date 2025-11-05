@@ -11,7 +11,7 @@ from typing import List
 from urllib.parse import unquote
 from tortoise.exceptions import DoesNotExist
 from karaoke.results import Result
-from karaoke.models import Files, History, FileList, HistoryList
+from karaoke.models import Files, History, FileList, HistoryList, SongTag, SongTagRelation, SongTagResponse, FileListWithTags, HistoryListWithTags
 from settings import logger, FILE_PATH, PAGE_SIZE, VIDEO_PATH
 
 
@@ -370,6 +370,173 @@ async def rename_song(file_id: int, new_name: str) -> Result:
             
         result.msg = f"歌曲 {old_name} 重命名为 {new_name} 成功"
         logger.info(result.msg)
+    except:
+        logger.error(traceback.format_exc())
+        result.code = 1
+        result.msg = "系统错误"
+    return result
+
+
+# 标签相关API函数
+async def get_all_tags() -> Result:
+    result = Result()
+    try:
+        tags = await SongTag.all().order_by('name')
+        tag_list = [SongTagResponse.from_orm_format(tag) for tag in tags]
+        result.data = tag_list
+        result.msg = "获取标签列表成功"
+        logger.info(result.msg)
+    except:
+        logger.error(traceback.format_exc())
+        result.code = 1
+        result.msg = "系统错误"
+    return result
+
+
+async def create_tag(name: str, color: str = '#007bff') -> Result:
+    result = Result()
+    try:
+        # 检查标签是否已存在
+        existing_tag = await SongTag.filter(name=name).first()
+        if existing_tag:
+            result.code = 1
+            result.msg = f"标签 '{name}' 已存在"
+            return result
+        
+        tag = await SongTag.create(name=name, color=color)
+        result.data = SongTagResponse.from_orm_format(tag)
+        result.msg = f"标签 '{name}' 创建成功"
+        logger.info(result.msg)
+    except:
+        logger.error(traceback.format_exc())
+        result.code = 1
+        result.msg = "系统错误"
+    return result
+
+
+async def update_tag(tag_id: int, name: str, color: str) -> Result:
+    result = Result()
+    try:
+        tag = await SongTag.get(id=tag_id)
+        tag.name = name
+        tag.color = color
+        await tag.save()
+        result.data = SongTagResponse.from_orm_format(tag)
+        result.msg = f"标签更新成功"
+        logger.info(result.msg)
+    except DoesNotExist:
+        result.code = 1
+        result.msg = "标签不存在"
+    except:
+        logger.error(traceback.format_exc())
+        result.code = 1
+        result.msg = "系统错误"
+    return result
+
+
+async def delete_tag(tag_id: int) -> Result:
+    result = Result()
+    try:
+        tag = await SongTag.get(id=tag_id)
+        # 删除标签时同时删除所有关联关系
+        await SongTagRelation.filter(tag_id=tag_id).delete()
+        await tag.delete()
+        result.msg = f"标签 '{tag.name}' 删除成功"
+        logger.info(result.msg)
+    except DoesNotExist:
+        result.code = 1
+        result.msg = "标签不存在"
+    except:
+        logger.error(traceback.format_exc())
+        result.code = 1
+        result.msg = "系统错误"
+    return result
+
+
+async def get_song_tags(song_id: int) -> Result:
+    result = Result()
+    try:
+        tag_relations = await SongTagRelation.filter(song_id=song_id)
+        tag_ids = [rel.tag_id for rel in tag_relations]
+        tags = await SongTag.filter(id__in=tag_ids)
+        tag_list = [SongTagResponse.from_orm_format(tag) for tag in tags]
+        result.data = tag_list
+        result.msg = "获取歌曲标签成功"
+        logger.info(result.msg)
+    except:
+        logger.error(traceback.format_exc())
+        result.code = 1
+        result.msg = "系统错误"
+    return result
+
+
+async def add_song_tag(song_id: int, tag_id: int) -> Result:
+    result = Result()
+    try:
+        # 检查歌曲是否存在
+        song = await Files.get(id=song_id)
+        # 检查标签是否存在
+        tag = await SongTag.get(id=tag_id)
+        
+        # 检查关联是否已存在
+        existing_relation = await SongTagRelation.filter(song_id=song_id, tag_id=tag_id).first()
+        if existing_relation:
+            result.code = 1
+            result.msg = "该标签已添加到此歌曲"
+            return result
+        
+        await SongTagRelation.create(song_id=song_id, tag_id=tag_id)
+        result.msg = f"标签 '{tag.name}' 添加到歌曲 '{song.name}' 成功"
+        logger.info(result.msg)
+    except DoesNotExist:
+        result.code = 1
+        result.msg = "歌曲或标签不存在"
+    except:
+        logger.error(traceback.format_exc())
+        result.code = 1
+        result.msg = "系统错误"
+    return result
+
+
+async def remove_song_tag(song_id: int, tag_id: int) -> Result:
+    result = Result()
+    try:
+        relation = await SongTagRelation.filter(song_id=song_id, tag_id=tag_id).first()
+        if not relation:
+            result.code = 1
+            result.msg = "未找到该标签关联"
+            return result
+        
+        await relation.delete()
+        result.msg = "标签已从歌曲中移除"
+        logger.info(result.msg)
+    except:
+        logger.error(traceback.format_exc())
+        result.code = 1
+        result.msg = "系统错误"
+    return result
+
+
+async def get_list_with_tags(q: str, page: int) -> Result:
+    result = Result()
+    try:
+        if q:
+            files = await Files.filter(name__icontains=q).order_by('-id').offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
+            total_num = await Files.filter(name__icontains=q).count()
+        else:
+            files = await Files.all().order_by('-id').offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
+            total_num = await Files.all().count()
+        
+        file_list = []
+        for f in files:
+            file_with_tags = await FileListWithTags.from_orm_format(f)
+            file_list.append(file_with_tags.dict())
+        
+        result.data = file_list
+        result.page = page
+        result.total = len(result.data)
+        result.totalPage = (total_num + PAGE_SIZE - 1) // PAGE_SIZE
+        logger.info("查询带标签的歌曲列表成功 ~")
     except:
         logger.error(traceback.format_exc())
         result.code = 1

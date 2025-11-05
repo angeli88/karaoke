@@ -130,6 +130,55 @@ async def rename_song(file_id: int, new_name: str):
     result = await views.rename_song(file_id, new_name)
     return result
 
+
+# 标签相关API端点
+@router.get("/tags", summary="获取所有标签")
+async def get_all_tags():
+    result = await views.get_all_tags()
+    return result
+
+
+@router.post("/tags", summary="创建标签")
+async def create_tag(name: str, color: str = '#007bff'):
+    result = await views.create_tag(name, color)
+    return result
+
+
+@router.put("/tags/{tag_id}", summary="更新标签")
+async def update_tag(tag_id: int, name: str, color: str):
+    result = await views.update_tag(tag_id, name, color)
+    return result
+
+
+@router.delete("/tags/{tag_id}", summary="删除标签")
+async def delete_tag(tag_id: int):
+    result = await views.delete_tag(tag_id)
+    return result
+
+
+@router.get("/songs/{song_id}/tags", summary="获取歌曲标签")
+async def get_song_tags(song_id: int):
+    result = await views.get_song_tags(song_id)
+    return result
+
+
+@router.post("/songs/{song_id}/tags/{tag_id}", summary="添加歌曲标签")
+async def add_song_tag(song_id: int, tag_id: int):
+    result = await views.add_song_tag(song_id, tag_id)
+    return result
+
+
+@router.delete("/songs/{song_id}/tags/{tag_id}", summary="移除歌曲标签")
+async def remove_song_tag(song_id: int, tag_id: int):
+    result = await views.remove_song_tag(song_id, tag_id)
+    return result
+
+
+@router.get("/listWithTags", summary="获取带标签的歌曲列表")
+async def song_list_with_tags(q: str = "", page: int = 1):
+    result = await views.get_list_with_tags(q, page)
+    return result
+
 # SSE功能对应的消息格式为 {"code": 0, "data": 1}
 # code = 0: 无实际含义，可用于心跳检测
 # code = 1: 开始/暂停K歌，data = 0 暂停，data = 1 开始，data = 3 已经开始播放，data = 4 已经停止播放，data = 5 第一次播放

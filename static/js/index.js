@@ -99,7 +99,7 @@ function get_song_list(page=1) {
     }
     $.ajax({
         type: "GET",
-        url: server + "/song/list?" + params,
+        url: server + "/song/listWithTags?" + params,
         success: function (data) {
             let s = '';
             if (data.code === 0) {
@@ -108,9 +108,16 @@ function get_song_list(page=1) {
                     return;
                 }
                 data.data.forEach(item => {
+                    let tagsHtml = '';
+                    if (item.tags && item.tags.length > 0) {
+                        item.tags.forEach(tag => {
+                            tagsHtml += `<span class="song-tag" style="background-color: ${tag.color}; color: white; padding: 2px 6px; margin: 0 2px; border-radius: 3px; font-size: 12px;">${tag.name}</span>`;
+                        });
+                    }
                     s = s + `<tr><td><input type="checkbox" class="song-checkbox" value="${item.id}"></td>
                             <td>${item.name}</td>
-                            <td><a onclick="sing_song(${item.id})">点歌</a><a onclick="rename_song(${item.id}, '${item.name}')">重命名</a><a onclick="delete_song(${item.id}, '${item.name}')">删除</a></td></tr>`;
+                            <td>${tagsHtml}</td>
+                            <td><a onclick="sing_song(${item.id})" title="点歌">点歌</a><a onclick="rename_song(${item.id}, '${item.name}')" title="重命名">重命名</a><a onclick="manage_tags(${item.id}, '${item.name}')" title="标签">标签</a><a onclick="delete_song(${item.id}, '${item.name}')" title="删除">删除</a></td></tr>`;
                 })
                 PagingManage($('#paging'), data.totalPage, data.page);
                 document.getElementsByTagName("table")[0].style.display = "";
@@ -164,7 +171,7 @@ function get_history_list(queryType) {
                     return;
                 }
                 data.data.forEach(item => {
-                    s = s + `<tr><td></td><td>${item.name}</td><td><a onclick="sing_song(${item.id})">点歌</a></td></tr>`;
+                    s = s + `<tr><td></td><td>${item.name}</td><td></td><td><a onclick="sing_song(${item.id})">点歌</a></td></tr>`;
                 })
                 PagingManage($('#paging'), data.totalPage, data.page);
                 document.getElementsByTagName("table")[0].style.display = "";
@@ -293,4 +300,133 @@ function rename_song(id, oldName) {
             }
         });
     }
+}
+
+
+// 标签管理相关函数
+function manage_tags(song_id, song_name) {
+    // 获取所有标签和当前歌曲的标签
+    $.ajax({
+        type: "GET",
+        url: server + "/song/tags",
+        success: function (allTagsData) {
+            if (allTagsData.code === 0) {
+                $.ajax({
+                    type: "GET",
+                    url: server + "/song/songs/" + song_id + "/tags",
+                    success: function (songTagsData) {
+                        if (songTagsData.code === 0) {
+                            show_tag_dialog(song_id, song_name, allTagsData.data, songTagsData.data);
+                        } else {
+                            $.Toast(songTagsData.msg, "error");
+                        }
+                    }
+                });
+            } else {
+                $.Toast(allTagsData.msg, "error");
+            }
+        }
+    });
+}
+
+
+function show_tag_dialog(song_id, song_name, all_tags, song_tags) {
+    // 创建标签管理对话框
+    let dialogHtml = `
+        <div id="tag-dialog" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; min-width: 400px; max-width: 600px;">
+                <h3>管理标签 - ${song_name}</h3>
+                <div style="margin: 15px 0;">
+                    <h4>选择标签：</h4>
+                    <div id="available-tags" style="display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0;">
+                        ${all_tags.map(tag => {
+                            let is_checked = song_tags.some(song_tag => song_tag.id === tag.id);
+                            return `<label style="display: inline-flex; align-items: center; background: ${tag.color}; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+                                <input type="checkbox" value="${tag.id}" ${is_checked ? 'checked' : ''} onchange="toggle_song_tag(${song_id}, ${tag.id}, this.checked, '${tag.name}')" style="margin-right: 4px;">
+                                ${tag.name}
+                            </label>`;
+                        }).join('')}
+                    </div>
+                </div>
+                <div style="margin: 15px 0;">
+                    <h4>创建新标签：</h4>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="new-tag-name" placeholder="标签名称" style="flex: 1; padding: 4px; border: 1px solid #ddd; border-radius: 4px;">
+                        <input type="color" id="new-tag-color" value="#007bff" style="width: 40px; height: 30px; border: none; border-radius: 4px;">
+                        <button onclick="create_new_tag(${song_id}, '${song_name}')" style="padding: 4px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">创建</button>
+                    </div>
+                </div>
+                <div style="text-align: right; margin-top: 20px;">
+                    <button onclick="close_tag_dialog()" style="padding: 6px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">关闭</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', dialogHtml);
+}
+
+
+function close_tag_dialog() {
+    let dialog = document.getElementById('tag-dialog');
+    if (dialog) {
+        dialog.remove();
+    }
+}
+
+
+function toggle_song_tag(song_id, tag_id, add, tag_name) {
+    if (add) {
+        $.ajax({
+            type: "POST",
+            url: server + "/song/songs/" + song_id + "/tags/" + tag_id,
+            success: function (data) {
+                if (data.code === 0) {
+                    $.Toast(data.msg, "success");
+                    get_song_list(currentPage); // 重新获取歌曲列表
+                } else {
+                    $.Toast(data.msg, "error");
+                }
+            }
+        });
+    } else {
+        $.ajax({
+            type: "DELETE",
+            url: server + "/song/songs/" + song_id + "/tags/" + tag_id,
+            success: function (data) {
+                if (data.code === 0) {
+                    $.Toast(data.msg, "success");
+                    get_song_list(currentPage); // 重新获取歌曲列表
+                } else {
+                    $.Toast(data.msg, "error");
+                }
+            }
+        });
+    }
+}
+
+
+function create_new_tag(song_id, song_name) {
+    let tag_name = document.getElementById('new-tag-name').value.trim();
+    let tag_color = document.getElementById('new-tag-color').value;
+    
+    if (!tag_name) {
+        $.Toast("请输入标签名称", "warning");
+        return;
+    }
+    
+    $.ajax({
+        type: "POST",
+        url: server + "/song/tags?name=" + encodeURIComponent(tag_name) + "&color=" + encodeURIComponent(tag_color),
+        success: function (data) {
+            if (data.code === 0) {
+                $.Toast(data.msg, "success");
+                close_tag_dialog();
+                get_song_list(currentPage); // 重新获取歌曲列表
+                manage_tags(song_id, song_name); // 重新打开标签管理对话框
+            } else {
+                $.Toast(data.msg, "error");
+            }
+        }
+    });
 }

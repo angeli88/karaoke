@@ -8,7 +8,8 @@ body {
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    width: 850px;
+    width: 90%;
+    max-width: 1400px;
     position: absolute;
 }
 
@@ -49,7 +50,7 @@ table {
     border-collapse: collapse;
     border: 0;
 }
-tbody>tr {height: 2rem;}
+tbody>tr {height: 1.8rem;}
 tbody>tr:hover {background-color: #E2E0E0FF;}
 
 tr>td {
@@ -60,9 +61,18 @@ tr>td {
 
 td>a {
     cursor: pointer;
-    margin-left: 3px;
-    margin-right: 9px;
+    margin-left: 1px;
+    margin-right: 1px;
     color: blue;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    text-decoration: none;
+    padding: 1px 2px;
+}
+
+td>a:hover {
+    text-decoration: underline;
+    background-color: #f0f8ff;
 }
 
 .modal_cover {
