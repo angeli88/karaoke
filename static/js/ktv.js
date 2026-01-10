@@ -336,8 +336,10 @@ document.getElementById("change-volume").addEventListener("click", () => {
         volume_setting.style.display = 'none';
         return;
     }
-    let volume_list = document.getElementsByClassName("setting")[0].offsetTop;
-    volume_setting.style.top = volume_list + 72 + "px";
+    // Let CSS handle positioning (bottom-aligned)
+    // let volume_list = document.getElementsByClassName("setting")[0].offsetTop;
+    // volume_setting.style.top = volume_list + 72 + "px";
+    
     volume_setting.style.display = 'flex';
     initVolume("volume-vocals-progress");
     initVolume("volume-acc-progress");
@@ -492,11 +494,28 @@ function moveFocusVertical(direction) {
 
 // 获取每行控制项数量
 function getItemsPerRow() {
-    const screenWidth = window.innerWidth;
-    if (screenWidth > 1200) return 5;
-    if (screenWidth > 800) return 4;
-    if (screenWidth > 600) return 3;
-    return 2;
+    const grid = document.querySelector('.control-grid');
+    if (!grid) return 4;
+    
+    // 使用 getComputedStyle 获取实际的列数
+    // 但 grid-template-columns 可能返回 "100px 100px 100px" 这样的字符串
+    // 另一种方法是直接看 offsetTop 相同的元素数量
+    
+    // 方法2: 简单且健壮的方法，计算第一行的元素数量
+    if (controlItems.length === 0) return 4;
+    
+    const firstItemTop = controlItems[0].offsetTop;
+    let count = 0;
+    
+    for (let i = 0; i < controlItems.length; i++) {
+        if (controlItems[i].offsetTop === firstItemTop) {
+            count++;
+        } else {
+            break;
+        }
+    }
+    
+    return count > 0 ? count : 4;
 }
 
 // 更新焦点显示

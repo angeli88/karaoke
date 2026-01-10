@@ -65,6 +65,59 @@
         </div></div>
     </div>
 </div>
+
+<!-- Remote Control Panel -->
+<div id="remote-control-panel" class="remote-control-panel">
+    <div class="control-grid">
+        <div class="control-item" data-action="play-pause" tabindex="0">
+            <div class="control-icon">⏯</div>
+            <div class="control-text" id="play-pause-text">暂停</div>
+        </div>
+        <div class="control-item" data-action="re-sing" tabindex="0">
+            <div class="control-icon">🔄</div>
+            <div class="control-text">重唱</div>
+        </div>
+        <div class="control-item" data-action="next-song" tabindex="0">
+            <div class="control-icon">⏭</div>
+            <div class="control-text">切歌</div>
+        </div>
+        <div class="control-item" data-action="vocal-switch" tabindex="0">
+            <div class="control-icon">🎤</div>
+            <div class="control-text">原唱/伴奏</div>
+        </div>
+        <div class="control-item" data-action="volume-vocal" tabindex="0">
+            <div class="control-icon">🗣</div>
+            <div class="control-text">人声 +</div>
+            <div class="volume-indicator" id="vocal-volume-indicator">100%</div>
+        </div>
+        <div class="control-item" data-action="volume-acc" tabindex="0">
+            <div class="control-icon">🎵</div>
+            <div class="control-text">伴奏 +</div>
+            <div class="volume-indicator" id="acc-volume-indicator">100%</div>
+        </div>
+        <div class="control-item" data-action="effect-applause" tabindex="0">
+            <div class="control-icon">👏</div>
+            <div class="control-text">掌声</div>
+        </div>
+        <div class="control-item" data-action="effect-cheer" tabindex="0">
+            <div class="control-icon">🎉</div>
+            <div class="control-text">欢呼</div>
+        </div>
+        <div class="control-item" data-action="effect-laugh" tabindex="0">
+            <div class="control-icon">😄</div>
+            <div class="control-text">大笑</div>
+        </div>
+        <div class="control-item" data-action="effect-sigh" tabindex="0">
+            <div class="control-icon">😮</div>
+            <div class="control-text">唏嘘</div>
+        </div>
+    </div>
+    <div class="control-hints">
+        <div class="hint-text">方向键：移动选择</div>
+        <div class="hint-text">回车：确认</div>
+        <div class="hint-text">返回键/ESC：关闭面板</div>
+    </div>
+</div>
 </body>
 <script>
     localStorage.setItem("server", "{{ prefix }}");

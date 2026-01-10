@@ -74,7 +74,7 @@ function loadSongList(page = 1, keyword = '', append = false) {
                 let s = "";
                 data.data.forEach((item, index) => {
                     let displayIndex = append ? ((page - 1) * 20 + index + 1) : (index + 1);
-                    s += `<div class="song-list"><div>${displayIndex}. ${item.name}</div><a style="font-size: 75%;" onclick="sing_song(${item.id})">点歌</a></div>`;
+                    s += `<div class="song-list"><div>${displayIndex}. ${item.name}</div><a class="song-list-btn" onclick="sing_song(${item.id})">点歌</a></div>`;
                 });
                 
                 if (append) {
@@ -87,6 +87,12 @@ function loadSongList(page = 1, keyword = '', append = false) {
                 hasMoreSongs = page < data.totalPage;
                 console.log(hasMoreSongs);
                 currentPage = page;
+                
+                // 如果内容不足以产生滚动条，且还有更多数据，自动加载下一页
+                const scrollContainer = document.getElementById("song-selection");
+                if (scrollContainer && hasMoreSongs && scrollContainer.scrollHeight <= scrollContainer.clientHeight + 1) {
+                     loadSongList(currentPage + 1, keyword, true);
+                }
             } else {
                 console.log(data.msg);
             }
@@ -121,15 +127,19 @@ document.getElementById("search-text").addEventListener('input', () =>{
 
 // 滚动加载更多
 function setupScrollLoading() {
-    const songContainer = document.getElementsByClassName("song-container")[0];
-    if (!songContainer) return;
+    const scrollContainer = document.getElementById("song-selection");
+    if (!scrollContainer) return;
     
-    songContainer.addEventListener('scroll', () => {
-        if (isLoading || !hasMoreSongs) return; // 移除了 isSearchMode 条件
+    // 防止重复绑定事件
+    if (scrollContainer.dataset.scrollAttached) return;
+    scrollContainer.dataset.scrollAttached = "true";
+    
+    scrollContainer.addEventListener('scroll', () => {
+        if (isLoading || !hasMoreSongs) return;
         
-        const scrollTop = songContainer.scrollTop;
-        const scrollHeight = songContainer.scrollHeight;
-        const clientHeight = songContainer.clientHeight;
+        const scrollTop = scrollContainer.scrollTop;
+        const scrollHeight = scrollContainer.scrollHeight;
+        const clientHeight = scrollContainer.clientHeight;
         
         // 当滚动到底部附近时加载更多
         if (scrollTop + clientHeight >= scrollHeight - 100) {

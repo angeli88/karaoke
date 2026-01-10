@@ -111,7 +111,7 @@ function get_song_list(page=1) {
                     let tagsHtml = '';
                     if (item.tags && item.tags.length > 0) {
                         item.tags.forEach(tag => {
-                            tagsHtml += `<span class="song-tag" style="background-color: ${tag.color}; color: white; padding: 2px 6px; margin: 0 2px; border-radius: 3px; font-size: 12px;">${tag.name}</span>`;
+                            tagsHtml += `<span class="song-tag" style="background-color: ${tag.color};">${tag.name}</span>`;
                         });
                     }
                     s = s + `<tr><td><input type="checkbox" class="song-checkbox" value="${item.id}"></td>
@@ -123,7 +123,7 @@ function get_song_list(page=1) {
                 document.getElementsByTagName("table")[0].style.display = "";
                 // document.getElementById("create-time").style.display = "";
                 document.getElementsByTagName("tbody")[0].innerHTML = s;
-                document.getElementById("batch-delete").style.display = "inline-block";
+                document.getElementById("batch-delete").style.display = "inline-flex";
 
                 document.getElementById('select-all').onchange = function() {
                     let checkboxes = document.getElementsByClassName('song-checkbox');
@@ -333,31 +333,31 @@ function manage_tags(song_id, song_name) {
 function show_tag_dialog(song_id, song_name, all_tags, song_tags) {
     // 创建标签管理对话框
     let dialogHtml = `
-        <div id="tag-dialog" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; min-width: 400px; max-width: 600px;">
+        <div id="tag-dialog" class="tag-dialog-overlay">
+            <div class="tag-dialog-content">
                 <h3>管理标签 - ${song_name}</h3>
-                <div style="margin: 15px 0;">
+                <div class="tag-section">
                     <h4>选择标签：</h4>
-                    <div id="available-tags" style="display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0;">
+                    <div id="available-tags" class="available-tags-container">
                         ${all_tags.map(tag => {
                             let is_checked = song_tags.some(song_tag => song_tag.id === tag.id);
-                            return `<label style="display: inline-flex; align-items: center; background: ${tag.color}; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
-                                <input type="checkbox" value="${tag.id}" ${is_checked ? 'checked' : ''} onchange="toggle_song_tag(${song_id}, ${tag.id}, this.checked, '${tag.name}')" style="margin-right: 4px;">
+                            return `<label class="tag-badge" style="background: ${tag.color}; color: white;">
+                                <input type="checkbox" value="${tag.id}" ${is_checked ? 'checked' : ''} onchange="toggle_song_tag(${song_id}, ${tag.id}, this.checked, '${tag.name}')">
                                 ${tag.name}
                             </label>`;
                         }).join('')}
                     </div>
                 </div>
-                <div style="margin: 15px 0;">
+                <div class="tag-section">
                     <h4>创建新标签：</h4>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <input type="text" id="new-tag-name" placeholder="标签名称" style="flex: 1; padding: 4px; border: 1px solid #ddd; border-radius: 4px;">
-                        <input type="color" id="new-tag-color" value="#007bff" style="width: 40px; height: 30px; border: none; border-radius: 4px;">
-                        <button onclick="create_new_tag(${song_id}, '${song_name}')" style="padding: 4px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">创建</button>
+                    <div class="tag-dialog-input-group">
+                        <input type="text" id="new-tag-name" placeholder="标签名称" class="tag-dialog-input">
+                        <input type="color" id="new-tag-color" value="#007bff" class="tag-color-input">
+                        <button onclick="create_new_tag(${song_id}, '${song_name}')" class="tag-dialog-btn tag-dialog-btn-primary">创建</button>
                     </div>
                 </div>
-                <div style="text-align: right; margin-top: 20px;">
-                    <button onclick="close_tag_dialog()" style="padding: 6px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">关闭</button>
+                <div class="dialog-footer">
+                    <button onclick="close_tag_dialog()" class="tag-dialog-btn tag-dialog-btn-secondary">关闭</button>
                 </div>
             </div>
         </div>

@@ -38,16 +38,15 @@
             <div class="next-song"></div>
           </div>
           <div class="img-contain">
-            <div style="width: 20%;" id="re-sing"><img style="width: 80%; height: 80%;" src="/static/img/re-sing.svg"
+            <div class="control-side-btn" id="re-sing"><img src="/static/img/re-sing.svg"
                 alt="re-sing.svg">
               <p>重唱</p>
             </div>
-            <div style="width: 50%;">
-              <img style="width: 100%; height: 100%; transition: transform 0.2s;" src="/static/img/music.svg"
+            <div class="control-center-btn">
+              <img src="/static/img/music.svg"
                 alt="music.svg" id="main-image">
             </div>
-            <div style="width: 20%;" id="next-song"><img style="width: 80%; height: 80%;"
-                src="/static/img/next_song.svg" alt="next_song.svg">
+            <div class="control-side-btn" id="next-song"><img src="/static/img/next_song.svg" alt="next_song.svg">
               <p>切歌</p>
             </div>
           </div>
@@ -91,9 +90,8 @@
       <!-- 已点歌曲区域 -->
       <div class="content-section" id="added-songs">
         <div class="section-header">
-          <h3>已点歌曲 (<span id="added-song-num1">0</span> 首)
-            <button id="next-song" onclick="send_message(3,0)"style=" margin-left: 5%; font-size: 1.25rem;" >切歌</button>
-          </h3>
+          <h3>已点歌曲 (<span id="added-song-num1">0</span> 首)</h3>
+          <button id="next-song" class="header-action-btn" onclick="send_message(3,0)">切歌</button>
         </div>
         <div class="added-container"></div>
       </div>
