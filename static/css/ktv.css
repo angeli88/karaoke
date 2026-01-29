@@ -14,7 +14,7 @@ body {
     top: var(--spacing-md);
     position: fixed;
     width: 100%;
-    font-size: var(--text-lg);
+    font-size: clamp(var(--text-lg), 1.5vw, 5rem);
     font-weight: 600;
     color: var(--warning-color);
     z-index: 9;
@@ -227,6 +227,7 @@ video {
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.3);
     transition: opacity 0.3s;
+    width: clamp(120px, 8vw, 300px);
 }
 
 .qr-code-container {
@@ -234,10 +235,11 @@ video {
     flex-direction: column;
     align-items: center;
     text-align: center;
+    width: 100%;
 }
 
 .qr-code-title {
-    font-size: var(--text-md);
+    font-size: clamp(var(--text-md), 1vw, 2rem);
     font-weight: 700;
     color: var(--text-primary);
     margin-bottom: var(--spacing-xs);
@@ -248,6 +250,15 @@ video {
     background: white;
     padding: var(--spacing-xs);
     border-radius: var(--radius-sm);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#qr-code-display img,
+#qr-code-display canvas {
+    width: 100% !important;
+    height: auto !important;
+    display: block;
 }
 
 /* Remote Control Panel (Overlay) */

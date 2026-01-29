@@ -628,18 +628,35 @@ function updatePlayPauseText() {
 function generateQRCode() {
     const qrCodeElement = document.getElementById('qr-code-display');
     if (qrCodeElement && typeof QRCode !== 'undefined') {
+        // 清除已有的二维码
+        qrCodeElement.innerHTML = '';
+        
         const currentUrl = window.location.origin + "/song";
+        
+        // 根据窗口大小计算二维码尺寸 (匹配 CSS 的 clamp(120px, 8vw, 300px))
+        // 乘以 devicePixelRatio 以确保在高分屏上清晰
+        let baseSize = Math.max(120, Math.min(300, window.innerWidth * 0.08));
+        let size = Math.floor(baseSize * (window.devicePixelRatio || 1));
         
         new QRCode(qrCodeElement, {
             text: currentUrl,
-            width: 120,
-            height: 120,
+            width: size,
+            height: size,
             colorDark: "#000000",
             colorLight: "#ffffff",
             correctLevel: QRCode.CorrectLevel.M
         });
     }
 }
+
+// 监听窗口大小变化，重新生成二维码
+let resizeTimeout;
+window.addEventListener('resize', function() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(function() {
+        generateQRCode();
+    }, 300);
+});
 
 // 监听视频播放状态变化
 video.addEventListener('play', function() {

@@ -171,10 +171,12 @@ function get_history_list(queryType) {
                     return;
                 }
                 data.data.forEach(item => {
-                    s = s + `<tr><td></td><td>${item.name}</td><td></td><td><a onclick="sing_song(${item.id})">点歌</a></td></tr>`;
+                    s = s + `<tr><td>${item.name}</td><td></td><td><a onclick="sing_song(${item.id})">点歌</a></td></tr>`;
                 })
                 PagingManage($('#paging'), data.totalPage, data.page);
                 document.getElementsByTagName("table")[0].style.display = "";
+                document.querySelectorAll('th')[0].style.display = "none";
+                document.getElementById("batch-delete").style.display = "none";
                 // document.getElementById("create-time").style.display = "none";
                 document.getElementsByTagName("tbody")[0].innerHTML = s;
             } else {
