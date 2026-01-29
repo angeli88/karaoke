@@ -109,10 +109,20 @@ tryPlay = () => {
 }
 
 // 同步时间
+let lastProgressUpdate = 0;
 video.addEventListener('timeupdate', () => {
     if (Math.abs(video.currentTime - vocals.currentTime) > 0.2 || Math.abs(accompaniment.currentTime - video.currentTime) > 0.2) {
         vocals.currentTime = video.currentTime;
         accompaniment.currentTime = video.currentTime;
+    }
+    
+    // 汇报播放进度，每秒一次
+    const now = Date.now();
+    if (now - lastProgressUpdate > 1000 && video.duration > 0) {
+        const percent = video.currentTime / video.duration;
+        // 使用 code=10 汇报进度，避免与 code=9 (调节进度) 冲突
+        send_message(10, percent);
+        lastProgressUpdate = now;
     }
 });
 
@@ -381,6 +391,16 @@ window.onload = function() {
             case 8:
                 getSingList(false);
                 showTips();
+                break;
+            case 9:
+                // 调节播放进度，data 为百分比
+                const percent = parseFloat(message.data);
+                if (!isNaN(percent) && video.duration) {
+                    const time = video.duration * percent;
+                    video.currentTime = time;
+                    vocals.currentTime = time;
+                    accompaniment.currentTime = time;
+                }
                 break;
         }
     };

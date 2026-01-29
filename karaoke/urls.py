@@ -189,4 +189,6 @@ async def song_list_with_tags(q: str = "", page: int = 1):
 # code = 6: 调整伴奏音量，data 为音量值
 # code = 7: 互动，data 为互动方式
 # code = 8: 查询已点歌曲列表
+# code = 9: 调节播放进度，data 为百分比 (0-1)
+# code = 10: 汇报播放进度，data 为百分比 (0-1)
 

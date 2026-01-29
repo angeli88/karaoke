@@ -162,6 +162,7 @@ document.getElementById("change-volume").addEventListener("click", () => {
     volume_setting.style.display = 'flex';
     initVolume("volume-vocals-progress");
     initVolume("volume-acc-progress");
+    initVolume("progress-play");
 })
 
 startRotate = () => {
@@ -252,27 +253,46 @@ initVolume = (eleId) => {
     if (eleId === "volume-vocals-progress") {
         progressEle.getElementsByClassName("mkpgb-cur")[0].style.width = vocalsVolume * 100 + '%';
         progressEle.getElementsByClassName("mkpgb-dot")[0].style.left = vocalsVolume * 100 + '%';
-    } else {
+    } else if (eleId === "volume-acc-progress") {
         progressEle.getElementsByClassName("mkpgb-cur")[0].style.width = accompanimentVolume * 100 + '%';
         progressEle.getElementsByClassName("mkpgb-dot")[0].style.left = accompanimentVolume * 100 + '%';
+    } else if (eleId === "progress-play") {
+        progressEle.getElementsByClassName("mkpgb-cur")[0].style.width = '0%';
+        progressEle.getElementsByClassName("mkpgb-dot")[0].style.left = '0%';
     }
-    if (isBindEvent) {return;}
+    if (progressEle.getAttribute("data-bind") === "true") {return;}
+    progressEle.setAttribute("data-bind", "true");
+    
     progressEle.getElementsByClassName("mkpgb-dot")[0].addEventListener("mousedown", (e) => {
         e.preventDefault();
     })
     progressEle.addEventListener("mousedown", (e) => {
         mdown = true;
-        isBindEvent = true;
+        progressEle.dataset.dragging = "true";
         barMove(e);
     })
     progressEle.addEventListener("mousemove", (e) => {
         barMove(e);
     })
     progressEle.addEventListener("mouseup", (e) => {
-        if (eleId === "volume-vocals-progress") {send_message(5, vocalsVolume);
-        } else {send_message(6, accompanimentVolume);}
+        if (eleId === "volume-vocals-progress") {
+            send_message(5, vocalsVolume);
+        } else if (eleId === "volume-acc-progress") {
+            send_message(6, accompanimentVolume);
+        } else if (eleId === "progress-play") {
+            let percent = 0;
+            let startIndex = progressEle.getBoundingClientRect().left;
+            if(e.clientX < startIndex){
+                percent = 0;
+            }else if(e.clientX > progressEle.clientWidth + startIndex){
+                percent = 1;
+            }else{
+                percent = (e.clientX - startIndex) / progressEle.clientWidth;
+            }
+            send_message(9, percent);
+        }
         mdown = false;
-        isBindEvent = true;
+        progressEle.dataset.dragging = "false";
     })
     function barMove(e) {
         if(!mdown) return;
@@ -286,7 +306,7 @@ initVolume = (eleId) => {
         }
         if (eleId === "volume-vocals-progress") {
             vocalsVolume = percent;
-        } else {
+        } else if (eleId === "volume-acc-progress") {
             accompanimentVolume = percent;
         }
         progressEle.getElementsByClassName("mkpgb-cur")[0].style.width = percent * 100 + '%';
@@ -354,6 +374,18 @@ window.onload = function() {
                 break;
             case 8:
                 getSingList();
+                break;
+            case 10:
+                // 实时更新播放进度
+                const progressEle = document.getElementById("progress-play");
+                if (progressEle && progressEle.dataset.dragging !== "true") {
+                    const percent = parseFloat(message.data);
+                    if (!isNaN(percent)) {
+                        progressEle.getElementsByClassName("mkpgb-cur")[0].style.width = percent * 100 + '%';
+                        progressEle.getElementsByClassName("mkpgb-dot")[0].style.left = percent * 100 + '%';
+                    }
+                }
+                break;
         }
     };
     eventSource.onerror = function(event) {
