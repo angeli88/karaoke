@@ -4,12 +4,15 @@
 
 import json
 import os.path
+import shutil
 import asyncio
+import uuid
 import subprocess
 import traceback
-from typing import List
+from typing import List, Dict
 from urllib.parse import unquote
 from tortoise.exceptions import DoesNotExist
+from audio_separator.separator import Separator
 from karaoke.results import Result
 from karaoke.models import Files, History, FileList, HistoryList, SongTag, SongTagRelation, SongTagResponse, FileListWithTags, HistoryListWithTags
 from settings import logger, FILE_PATH, PAGE_SIZE, VIDEO_PATH
@@ -17,6 +20,11 @@ from settings import logger, FILE_PATH, PAGE_SIZE, VIDEO_PATH
 
 clients: List[asyncio.Queue] = []
 ffmpeg_cmd = 'ffmpeg'
+
+# 任务管理字典，用于存储人声分离任务状态
+tasks: Dict[str, dict] = {}
+# 并发控制：最大 3 个并行处理
+task_semaphore = asyncio.Semaphore(3)
 
 
 async def broadcast_data(data: dict):
@@ -60,6 +68,106 @@ async def upload_file(query) -> Result:
         result.msg = "系统错误"
         logger.error(f"{file_name} 上传失败")
         logger.error(traceback.format_exc())
+    return result
+
+
+    return result
+
+
+async def upload_separate(query) -> Result:
+    result = Result()
+    query = await query.form()
+    file_obj = query['file']
+    # 关键点：使用 os.path.basename 剥离路径，防止上传文件夹时包含子目录导致 open() 失败
+    file_name = os.path.basename(file_obj.filename)
+    data = file_obj.file
+    try:
+        # 直接保存上传的文件
+        file_path = os.path.join(VIDEO_PATH, file_name)
+        with open(file_path, 'wb') as f:
+            f.write(data.read())
+        
+        logger.info(f"文件 {file_name} 上传成功，正在创建后台分离任务...")
+        
+        # 创建任务ID
+        task_id = uuid.uuid4().hex
+        tasks[task_id] = {
+            "id": task_id,
+            "name": file_name,
+            "status": "pending",
+            "msg": "等待中...",
+            "update_time": asyncio.get_event_loop().time()
+        }
+        
+        # 启动后台任务
+        asyncio.create_task(run_separation_background(task_id, file_name))
+        
+        result.msg = "已创建后台任务"
+        result.data = {"task_id": task_id}
+            
+    except Exception as e:
+        result.code = 1
+        result.msg = f"创建任务失败: {str(e)}"
+        logger.error(f"{file_name} 后台分离任务创建失败")
+        logger.error(traceback.format_exc())
+    return result
+
+
+async def run_separation_background(task_id: str, file_name: str):
+    """后台运行分离任务的协程，支持并发限制和排队"""
+    try:
+        tasks[task_id]["status"] = "pending"
+        tasks[task_id]["msg"] = "排队中..."
+        tasks[task_id]["update_time"] = asyncio.get_event_loop().time()
+        
+        # 使用信号量限制并发数
+        async with task_semaphore:
+            tasks[task_id]["status"] = "processing"
+            tasks[task_id]["msg"] = "正在分离人声..."
+            tasks[task_id]["update_time"] = asyncio.get_event_loop().time()
+            
+            # 调用现有的分离逻辑
+            res = await separate_audio(file_name)
+            
+            if res.code == 0:
+                tasks[task_id]["status"] = "success"
+                tasks[task_id]["msg"] = "分离成功并已入库"
+            else:
+                tasks[task_id]["status"] = "failed"
+                tasks[task_id]["msg"] = res.msg
+            
+    except Exception as e:
+        logger.error(f"任务 {task_id} 处理出错: {str(e)}")
+        tasks[task_id]["status"] = "failed"
+        tasks[task_id]["msg"] = f"系统内部错误: {str(e)}"
+    finally:
+        tasks[task_id]["update_time"] = asyncio.get_event_loop().time()
+
+
+async def get_all_tasks() -> Result:
+    """获取所有任务状态"""
+    result = Result()
+    # 任务清理逻辑：清理超过 1 小时的已完成任务
+    now = asyncio.get_event_loop().time()
+    task_ids_to_remove = [tid for tid, t in tasks.items() 
+                          if (t["status"] in ["success", "failed"]) and (now - t["update_time"] > 3600)]
+    for tid in task_ids_to_remove:
+        tasks.pop(tid, None)
+
+    # 按时间排序返回最近的 50 个任务
+    sorted_tasks = sorted(tasks.values(), key=lambda x: x["update_time"], reverse=True)[:50]
+    result.data = sorted_tasks
+    return result
+
+
+async def get_task_status(task_id: str) -> Result:
+    """获取单个任务状态"""
+    result = Result()
+    if task_id in tasks:
+        result.data = tasks[task_id]
+    else:
+        result.code = 1
+        result.msg = "任务不存在"
     return result
 
 
@@ -330,6 +438,97 @@ async def convert_audio(file_name: str) -> Result:
         logger.error(traceback.format_exc())
         result.code = 1
         result.msg = "系统错误"
+    return result
+
+
+async def separate_audio(file_name: str) -> Result:
+    result = Result()
+    try:
+        # 确保只处理文件名部分，防止路径干扰
+        file_name = os.path.basename(unquote(file_name))
+        file_format = file_name.split(".")[-1]
+        name = file_name.replace(f".{file_format}", "")
+        
+        # 输入文件路径，直接使用上传的文件名
+        input_file = os.path.join(VIDEO_PATH, file_name)
+        # 兜底：如果直接匹配不到，尝试查找带有 _origin 的文件（兼容旧逻辑）
+        if not os.path.exists(input_file):
+            input_file = os.path.join(VIDEO_PATH, f"{name}_origin.{file_format}")
+            
+        if not os.path.exists(input_file):
+            result.code = 1
+            result.msg = f"找不到待分离的文件: {file_name}"
+            return result
+
+        logger.info(f"开始对 {input_file} 进行人声分离...")
+        
+        # 局部初始化分离器，避免全局单例在多任务并发时的 NoneType 竞争问题
+        # 虽然这会增加一点内存开销，但对于 CPU 运行模式来说更稳定
+        loop = asyncio.get_event_loop()
+        
+        def run_separation():
+            separator = Separator(output_format="mp3", output_dir=VIDEO_PATH)
+            separator.load_model(model_filename='UVR-MDX-NET-Inst_HQ_3.onnx')
+            return separator.separate(input_file)
+            
+        output_files = await loop.run_in_executor(None, run_separation)
+        
+        if len(output_files) >= 2:
+            # 基础歌曲名称
+            song_name = name.replace("_origin", "")
+            
+            # 移动并重命名文件到曲库目录
+            vocals_path = os.path.join(FILE_PATH, f"{song_name}_vocals.mp3")
+            accompaniment_path = os.path.join(FILE_PATH, f"{song_name}_accompaniment.mp3")
+            
+            for out_file in output_files:
+                # 确保使用绝对路径，audio-separator 可能返回的是相对于 output_dir 的文件名
+                full_out_path = out_file if os.path.isabs(out_file) else os.path.join(VIDEO_PATH, out_file)
+                
+                if 'Vocals' in out_file:
+                    shutil.move(full_out_path, vocals_path)
+                elif 'Instrumental' in out_file:
+                    shutil.move(full_out_path, accompaniment_path)
+                else:
+                    if not os.path.exists(vocals_path):
+                        shutil.move(full_out_path, vocals_path)
+                    elif not os.path.exists(accompaniment_path):
+                        shutil.move(full_out_path, accompaniment_path)
+
+            # 检查视频文件（即上传的文件本身或处理后的视频）
+            # 优先使用原上传文件作为视频源（如果是 MP4）
+            video_source = input_file if file_format.lower() == 'mp4' else os.path.join(VIDEO_PATH, f"{song_name}.mp4")
+            video_dest = os.path.join(FILE_PATH, f"{song_name}.mp4")
+            
+            if os.path.exists(video_source):
+                # 如果源和目标不是同一个文件，则移动
+                if os.path.abspath(video_source) != os.path.abspath(video_dest):
+                    shutil.move(video_source, video_dest)
+            
+            # 更新数据库
+            try:
+                file_record = await Files.get(name=song_name)
+            except DoesNotExist:
+                file_record = await Files.create(name=song_name, is_sing=0)
+            
+            # 检查是否三个文件都凑齐了，凑齐了就设置 is_sing = 1
+            if os.path.exists(os.path.join(FILE_PATH, f"{song_name}.mp4")) and \
+               os.path.exists(os.path.join(FILE_PATH, f"{song_name}_vocals.mp3")) and \
+               os.path.exists(os.path.join(FILE_PATH, f"{song_name}_accompaniment.mp3")):
+                file_record.is_sing = 1
+                await file_record.save()
+
+            result.msg = "人声分离完成并已自动加入曲库"
+            result.data = song_name
+            logger.info(result.msg)
+        else:
+            result.code = 1
+            result.msg = "人声分离失败，未生成预期的文件"
+            
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        result.code = 1
+        result.msg = f"人声分离出错: {str(e)}"
     return result
 
 

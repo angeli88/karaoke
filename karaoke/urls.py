@@ -80,6 +80,24 @@ async def upload_file(query: Request):
     return result
 
 
+@router.post('/upload/separate', summary="上传并分离")
+async def upload_separate(query: Request):
+    result = await views.upload_separate(query)
+    return result
+
+
+@router.get('/tasks/all', summary="获取所有任务状态")
+async def get_all_tasks():
+    result = await views.get_all_tasks()
+    return result
+
+
+@router.get('/tasks/status/{task_id}', summary="获取单个任务状态")
+async def get_task_status(task_id: str):
+    result = await views.get_task_status(task_id)
+    return result
+
+
 @router.get('/deal/video/{file_name}', summary="处理视频")
 async def deal_video(file_name: str, query: Request):
     result = await views.deal_video(file_name)
@@ -95,6 +113,12 @@ async def convert_audio(file_name: str, query: Request):
 @router.get('/convert/video/{file_name}', summary="处理视频")
 async def convert_video(file_name: str, query: Request):
     result = await views.convert_video(file_name)
+    return result
+
+
+@router.get('/separate/audio/{file_name}', summary="人声分离")
+async def separate_audio(file_name: str, query: Request):
+    result = await views.separate_audio(file_name)
     return result
 
 

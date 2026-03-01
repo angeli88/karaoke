@@ -28,6 +28,11 @@
             <label style="width: 100px;">视频文件：</label><input id="mp4-name" type="text" readonly disabled style="width: 300px;">
             <a href="#" style="text-decoration: none; width: 100px; margin-left: 16px;" target="_blank" id="video-down">下载</a>
         </div>
+        <div style="display: flex;flex-direction: row;justify-content: space-between; margin: 10px 0; border-top: 1px solid #ccc; padding-top: 10px; width: 500px;">
+            <label style="width: 100px;">人声分离：</label>
+            <input id="separate-name" type="text" readonly disabled style="width: 300px;" placeholder="处理完成后自动加入曲库">
+            <a href="#" id="separate-audio" style="text-decoration: none; width: 100px; margin-left: 16px;">开始分离</a>
+        </div>
     </div>
     <div style="display: flex; flex-direction: column; justify-content: flex-start; align-items: center; margin-top: 3rem;">
         <p style="width: 50%;">主要用于将其他视频格式转成 mp4 格式。</p>
@@ -57,6 +62,39 @@
         <div style="display: flex;flex-direction: row;justify-content: space-between; margin: 10px 0;">
             <label style="width: 100px;">音频文件：</label><input id="mp3-name-audio" type="text" readonly disabled style="width: 300px;">
             <a href="#" style="text-decoration: none; width: 100px; margin-left: 16px;" target="_blank" id="audio-down-audio">下载</a>
+        </div>
+    </div>
+    <div style="display: flex; flex-direction: column; justify-content: flex-start; align-items: center; margin-top: 3rem;">
+        <p style="width: 50%;">人声分离（独立选项）：支持多选 MP4 文件或文件夹上传，分离完成后自动加入曲库。</p>
+        <div style="margin: 10px 0;">
+            <input id="file-input-batch-separate" type="file" accept=".mp4" multiple style="display: none;">
+            <input id="dir-input-batch-separate" type="file" accept=".mp4" multiple webkitdirectory mozdirectory style="display: none;">
+            <span style="font-weight: bold;">批量人声分离：</span>
+            <a href="#" id="batch-upload-files" style="text-decoration: none; margin-right: 20px;">选择文件</a>
+            <a href="#" id="batch-upload-dir" style="text-decoration: none;">选择文件夹</a>
+        </div>
+        <div id="batch-process-status" style="width: 50%; max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; display: none;">
+            <ul id="status-list" style="list-style: none; padding: 0; margin: 0; font-size: 14px;"></ul>
+        </div>
+    </div>
+    <div style="display: flex; flex-direction: column; justify-content: flex-start; align-items: center; margin-top: 3rem; margin-bottom: 5rem;">
+        <div style="display: flex; flex-direction: row; justify-content: space-between; width: 50%; align-items: center;">
+            <p>分离任务管理：查看最近 50 条处理任务的状态。</p>
+            <a href="#" id="refresh-tasks-btn" style="text-decoration: none; font-size: 14px;">立即刷新</a>
+        </div>
+        <div style="width: 50%; max-height: 400px; overflow-y: auto; border: 1px solid #eee; padding: 10px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #eee; text-align: left;">
+                        <th style="padding: 8px;">文件名</th>
+                        <th style="padding: 8px;">状态</th>
+                        <th style="padding: 8px;">详情</th>
+                    </tr>
+                </thead>
+                <tbody id="task-list-body">
+                    <tr><td colspan="3" style="text-align: center; padding: 20px; color: #999;">暂无任务</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -241,6 +279,167 @@
             }
         })
     })
+
+    document.getElementById("separate-audio").addEventListener('click', () => {
+        let file_name = document.getElementById("video-name").value;
+        if (file_name === null || file_name === '' || file_name === undefined) {
+            $.Toast('请先上传视频文件 ~', 'error');
+            return;
+        }
+        show_modal_cover();
+        $.ajax({
+            type: "GET",
+            url: server + "/song/separate/audio/" + file_name,
+            success: function (data) {
+                if (data.code === 0) {
+                    document.getElementById("separate-name").value = data['data'] + " (已加入曲库)";
+                    $.Toast('人声分离完成并已加入曲库 ~', 'success');
+                } else {
+                    $.Toast(data.msg, 'error');
+                }
+                close_modal_cover();
+            },
+            error: function() {
+                $.Toast('系统错误，请检查后台日志 ~', 'error');
+                close_modal_cover();
+            }
+        })
+    })
+
+    async function handleBatchFiles(fileList) {
+        // 将 FileList 转换为 Array 以确保遍历稳定性
+        const files = Array.from(fileList);
+        if (files.length < 1) return;
+
+        let statusContainer = document.getElementById("batch-process-status");
+        let statusList = document.getElementById("status-list");
+        statusContainer.style.display = 'block';
+        statusList.innerHTML = '';
+
+        // 串行上传以避免网络拥塞，但后台分离任务是并行的
+        for (let i = 0; i < files.length; i++) {
+            let file = files[i];
+            if (!file.name.match(/\.mp4$/i)) continue;
+
+            let li = document.createElement('li');
+            li.id = `file-status-${i}`;
+            li.innerHTML = `<span style="color: #666;">[上传中...]</span> ${file.name}`;
+            statusList.appendChild(li);
+
+            let formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                // 使用 await 确保当前文件上传完成后再开始下一个上传
+                let response = await fetch(server + "/song/upload/separate", {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    let res = await response.json();
+                    if (res.code === 0) {
+                        let taskId = res.data.task_id;
+                        li.innerHTML = `<span style="color: #007bff;">[已创建任务: ${taskId}]</span> ${file.name}`;
+                        pollTaskStatus(taskId, li);
+                    } else {
+                        li.innerHTML = `<span style="color: #dc3545;">[上传失败: ${res.msg}]</span> ${file.name}`;
+                    }
+                } else {
+                    li.innerHTML = `<span style="color: #dc3545;">[服务器响应错误: ${response.status}]</span> ${file.name}`;
+                }
+            } catch (error) {
+                li.innerHTML = `<span style="color: #dc3545;">[错误: 网络异常]</span> ${file.name}`;
+            }
+            statusContainer.scrollTop = statusContainer.scrollHeight;
+        }
+        $.Toast('文件上传及任务创建完成，请在下方查看任务状态 ~', 'success');
+    }
+
+    async function pollTaskStatus(taskId, element) {
+        const interval = setInterval(async () => {
+            try {
+                let response = await fetch(server + "/song/tasks/status/" + taskId);
+                let res = await response.json();
+                if (res.code === 0) {
+                    let task = res.data;
+                    let statusColor = "#666";
+                    if (task.status === "pending") statusColor = "#f39c12"; // 橙色表示排队中
+                    else if (task.status === "processing") statusColor = "#007bff";
+                    else if (task.status === "success") statusColor = "#28a745";
+                    else if (task.status === "failed") statusColor = "#dc3545";
+
+                    element.innerHTML = `<span style="color: ${statusColor};">[${task.msg}]</span> ${task.name}`;
+                    
+                    if (task.status === "success" || task.status === "failed") {
+                        clearInterval(interval);
+                        refreshTaskList(); // 任务完成后刷新全局列表
+                    }
+                }
+            } catch (error) {
+                console.error("轮询失败", error);
+            }
+        }, 2000);
+    }
+
+    async function refreshTaskList() {
+        try {
+            let response = await fetch(server + "/song/tasks/all");
+            let res = await response.json();
+            if (res.code === 0) {
+                let tbody = document.getElementById("task-list-body");
+                if (res.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px; color: #999;">暂无任务</td></tr>';
+                    return;
+                }
+                let html = "";
+                res.data.forEach(task => {
+                    let statusColor = "#666";
+                    if (task.status === "pending") statusColor = "#f39c12"; // 橙色表示排队中
+                    else if (task.status === "processing") statusColor = "#007bff";
+                    else if (task.status === "success") statusColor = "#28a745";
+                    else if (task.status === "failed") statusColor = "#dc3545";
+
+                    html += `<tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 8px;">${task.name}</td>
+                        <td style="padding: 8px; color: ${statusColor};">${task.status}</td>
+                        <td style="padding: 8px; color: #666;">${task.msg}</td>
+                    </tr>`;
+                });
+                tbody.innerHTML = html;
+            }
+        } catch (error) {
+            console.error("刷新任务列表失败", error);
+        }
+    }
+
+    // 页面加载时刷新一次任务列表，并定时刷新
+    refreshTaskList();
+    setInterval(refreshTaskList, 5000);
+
+    document.getElementById("refresh-tasks-btn").addEventListener('click', (e) => {
+        e.preventDefault();
+        refreshTaskList();
+    });
+
+    document.getElementById("batch-upload-files").addEventListener('click', () => {
+        let fileInput = document.getElementById("file-input-batch-separate");
+        fileInput.click();
+        fileInput.onchange = function (event) {
+            handleBatchFiles(event.target.files);
+            fileInput.value = '';
+        }
+    })
+
+    document.getElementById("batch-upload-dir").addEventListener('click', () => {
+        let dirInput = document.getElementById("dir-input-batch-separate");
+        dirInput.click();
+        dirInput.onchange = function (event) {
+            handleBatchFiles(event.target.files);
+            dirInput.value = '';
+        }
+    })
+
     function show_modal_cover() {
         $('.modal_cover')[0].style.display = 'flex';
         $('.modal_cover>.modal_gif')[0].style.display = 'flex';
