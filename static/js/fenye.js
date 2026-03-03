@@ -6,7 +6,7 @@
  * @param fenye_url
  */
 
-function PagingManage(obj, pageNum, currentpage) {
+function PagingManage(obj, pageNum, currentpage, callbackName = 'get_song_list') {
     if (obj) {
         let showPageNum = 7;//显示多少个页码
         let pagehtml = "";
@@ -19,7 +19,7 @@ function PagingManage(obj, pageNum, currentpage) {
         //大于一页内容
         if (pageNum > 1) {
             if (currentpage > 1) {
-                pagehtml += '<li><a href="#" onclick="get_song_list(' + (currentpage - 1) + ')">上一页</a></li>';
+                pagehtml += '<li><a href="#" onclick="' + callbackName + '(' + (currentpage - 1) + ')">上一页</a></li>';
             }
 
             //计算页码开始位置
@@ -30,48 +30,48 @@ function PagingManage(obj, pageNum, currentpage) {
                     break;
                 }
                 if (i === currentpage) {
-                    pagehtml += '<li><a class="active" href="#" onclick="get_song_list(' + i + ')">' + i + '</a></li>';
+                    pagehtml += '<li><a class="active" href="#" onclick="' + callbackName + '(' + i + ')">' + i + '</a></li>';
                 } else {
-                    pagehtml += '<li><a href="#" onclick="get_song_list(' + i + ')">' + i + '</a></li>';
+                    pagehtml += '<li><a href="#" onclick="' + callbackName + '(' + i + ')">' + i + '</a></li>';
                 }
             }
             } else {//如果要显示的页码小于总的页码数
                 if (currentpage < 4) {
                     for (let i = 1; i <= 5; i++) {
                         if (i === currentpage) {
-                            pagehtml += '<li><a class="active" href="#" onclick="get_song_list(' + i + ')">' + i + '</a></li>';
+                            pagehtml += '<li><a class="active" href="#" onclick="' + callbackName + '(' + i + ')">' + i + '</a></li>';
                         } else {
-                            pagehtml += '<li><a href="#" onclick="get_song_list(' + i + ')">' + i + '</a></li>';
+                            pagehtml += '<li><a href="#" onclick="' + callbackName + '(' + i + ')">' + i + '</a></li>';
                         }
                     }
                     pagehtml += '<li><a>...</a></li>';
-                    pagehtml += '<li><a href="#" onclick="get_song_list(' + pageNum + ')">' + pageNum + '</a></li>';
+                    pagehtml += '<li><a href="#" onclick="' + callbackName + '(' + pageNum + ')">' + pageNum + '</a></li>';
                 } else if (currentpage > pageNum-3) {
-                    pagehtml += '<li><a href="#" onclick="get_song_list(' + 1 + ')">' + 1 + '</a></li>';
+                    pagehtml += '<li><a href="#" onclick="' + callbackName + '(' + 1 + ')">' + 1 + '</a></li>';
                     pagehtml += '<li><a>...</a></li>';
                     for (let i = pageNum-4; i <= pageNum; i++) {
                         if (i === currentpage) {
-                            pagehtml += '<li><a class="active" href="#" onclick="get_song_list(' + i + ')">' + i + '</a></li>';
+                            pagehtml += '<li><a class="active" href="#" onclick="' + callbackName + '(' + i + ')">' + i + '</a></li>';
                         } else {
-                            pagehtml += '<li><a href="#" onclick="get_song_list(' + i + ')">' + i + '</a></li>';
+                            pagehtml += '<li><a href="#" onclick="' + callbackName + '(' + i + ')">' + i + '</a></li>';
                         }
                     }
                 } else {
-                    pagehtml += '<li><a href="#" onclick="get_song_list(' + 1 + ')">' + 1 + '</a></li>';
+                    pagehtml += '<li><a href="#" onclick="' + callbackName + '(' + 1 + ')">' + 1 + '</a></li>';
                     pagehtml += '<li><a>...</a></li>';
                     for (let i = currentpage-1; i <= currentpage+1; i++) {
                         if (i === currentpage) {
-                            pagehtml += '<li><a class="active" href="#" onclick="get_song_list(' + i + ')">' + i + '</a></li>';
+                            pagehtml += '<li><a class="active" href="#" onclick="' + callbackName + '(' + i + ')">' + i + '</a></li>';
                         } else {
-                            pagehtml += '<li><a href="#" onclick="get_song_list(' + i + ')">' + i + '</a></li>';
+                            pagehtml += '<li><a href="#" onclick="' + callbackName + '(' + i + ')">' + i + '</a></li>';
                         }
                     }
                     pagehtml += '<li><a>...</a></li>';
-                    pagehtml += '<li><a href="#" onclick="get_song_list(' + pageNum + ')">' + pageNum + '</a></li>';
+                    pagehtml += '<li><a href="#" onclick="' + callbackName + '(' + pageNum + ')">' + pageNum + '</a></li>';
                 }
             }
             if (currentpage < pageNum) {
-                pagehtml += '<li><a href="#" onclick="get_song_list(' + (currentpage + 1) + ')">下一页</a></li>';
+                pagehtml += '<li><a href="#" onclick="' + callbackName + '(' + (currentpage + 1) + ')">下一页</a></li>';
             }
         }
         obj.html(pagehtml);

@@ -157,8 +157,8 @@ async def rename_song(file_id: int, new_name: str):
 
 # 标签相关API端点
 @router.get("/tags", summary="获取所有标签")
-async def get_all_tags():
-    result = await views.get_all_tags()
+async def get_all_tags(page: int = 1, q: str = ""):
+    result = await views.get_all_tags(page, q)
     return result
 
 
@@ -195,6 +195,12 @@ async def add_song_tag(song_id: int, tag_id: int):
 @router.delete("/songs/{song_id}/tags/{tag_id}", summary="移除歌曲标签")
 async def remove_song_tag(song_id: int, tag_id: int):
     result = await views.remove_song_tag(song_id, tag_id)
+    return result
+
+
+@router.post("/tags/auto", summary="根据歌曲名称自动添加标签")
+async def auto_tag_all_songs():
+    result = await views.auto_tag_all_songs()
     return result
 
 

@@ -9,6 +9,7 @@ import asyncio
 import uuid
 import subprocess
 import traceback
+import csv
 from typing import List, Dict
 from urllib.parse import unquote
 from tortoise.exceptions import DoesNotExist
@@ -577,10 +578,26 @@ async def rename_song(file_id: int, new_name: str) -> Result:
 
 
 # 标签相关API函数
-async def get_all_tags() -> Result:
+async def get_all_tags(page: int = 1, q: str = "") -> Result:
     result = Result()
     try:
-        tags = await SongTag.all().order_by('name')
+        if page > 0:
+            query = SongTag.all().order_by('name')
+            if q:
+                query = query.filter(name__icontains=q)
+            
+            total_num = await query.count()
+            tags = await query.offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
+            
+            result.totalPage = (total_num + PAGE_SIZE - 1) // PAGE_SIZE
+            result.page = page
+            result.total = total_num
+        else:
+            query = SongTag.all().order_by('name')
+            if q:
+                query = query.filter(name__icontains=q)
+            tags = await query
+        
         tag_list = [SongTagResponse.from_orm_format(tag) for tag in tags]
         result.data = tag_list
         result.msg = "获取标签列表成功"
@@ -736,6 +753,91 @@ async def get_list_with_tags(q: str, page: int) -> Result:
         result.total = len(result.data)
         result.totalPage = (total_num + PAGE_SIZE - 1) // PAGE_SIZE
         logger.info("查询带标签的歌曲列表成功 ~")
+    except:
+        logger.error(traceback.format_exc())
+        result.code = 1
+        result.msg = "系统错误"
+    return result
+
+
+async def auto_tag_all_songs() -> Result:
+    result = Result()
+    try:
+        # 1. 获取数据库中所有已存在的标签
+        existing_tags = await SongTag.all()
+        tag_dict = {tag.name.lower(): tag for tag in existing_tags}
+        
+        # 2. 从 CSV 加载歌手信息
+        csv_file_path = "/Users/li/Code/github/karaoke/static/file/singer_.csv"
+        csv_singers = []
+        if os.path.exists(csv_file_path):
+            with open(csv_file_path, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if len(row) >= 2:
+                        singer_name = row[1].strip()
+                        if singer_name:
+                            csv_singers.append(singer_name)
+        
+        # 3. 合并数据库标签名和 CSV 歌手名
+        # 将 CSV 歌手也作为潜在标签名，且去重
+        all_potential_tag_names = set(tag_dict.keys())
+        for s in csv_singers:
+            all_potential_tag_names.add(s.lower())
+        
+        # 获取所有歌曲
+        songs = await Files.all()
+        if not songs:
+            result.code = 1
+            result.msg = "曲库中没有歌曲"
+            return result
+        
+        count = 0
+        tag_count = 0
+        
+        # 预加载所有歌曲的标签关系，避免在循环中频繁查询
+        # 但考虑到歌曲数量和标签关系数量，可能需要根据实际情况权衡
+        # 这里为了逻辑清晰，采用更稳妥的方式
+        
+        for song in songs:
+            song_updated = False
+            # 对于每一首歌曲，检查是否包含任何歌手名
+            for singer_name_lower in all_potential_tag_names:
+                # 模糊匹配：歌曲名称是否包含歌手名称
+                if singer_name_lower in song.name.lower():
+                    # 匹配成功，准备打标签
+                    # 首先确定标签对应的真实名称（优先用数据库里的，其次用 CSV 里的）
+                    tag_name = ""
+                    if singer_name_lower in tag_dict:
+                        tag_obj = tag_dict[singer_name_lower]
+                        tag_name = tag_obj.name
+                    else:
+                        # 从 CSV 歌手列表中找回原始大小写的名称
+                        # 这里简单处理，取第一个匹配到的
+                        for s in csv_singers:
+                            if s.lower() == singer_name_lower:
+                                tag_name = s
+                                break
+                        
+                        # 如果数据库里没有该标签，先创建
+                        if tag_name:
+                            tag_obj = await SongTag.create(name=tag_name, color='#007bff')
+                            tag_dict[singer_name_lower] = tag_obj
+                        else:
+                            continue # 不太可能发生
+
+                    # 检查关联是否已存在
+                    existing_relation = await SongTagRelation.filter(song_id=song.id, tag_id=tag_obj.id).first()
+                    if not existing_relation:
+                        await SongTagRelation.create(song_id=song.id, tag_id=tag_obj.id)
+                        tag_count += 1
+                        song_updated = True
+            
+            if song_updated:
+                count += 1
+        
+        result.msg = f"自动打标签完成。共遍历 {len(songs)} 首歌曲，为 {count} 首歌曲添加了 {tag_count} 个标签。"
+        logger.info(result.msg)
     except:
         logger.error(traceback.format_exc())
         result.code = 1
