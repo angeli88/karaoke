@@ -27,8 +27,8 @@ async def upload_file(query: Request):
 
 
 @router.get("/list", summary="歌曲列表")
-async def song_list(q: str = "", page: int = 1):
-    result = await views.get_list(q, page)
+async def song_list(q: str = "", page: int = 1, tag_id: int = None):
+    result = await views.get_list_with_tags(q, page, tag_id)
     return result
 
 
@@ -157,8 +157,8 @@ async def rename_song(file_id: int, new_name: str):
 
 # 标签相关API端点
 @router.get("/tags", summary="获取所有标签")
-async def get_all_tags(page: int = 1, q: str = ""):
-    result = await views.get_all_tags(page, q)
+async def get_all_tags(page: int = 1, q: str = "", initial: str = ""):
+    result = await views.get_all_tags(page, q, initial)
     return result
 
 
@@ -205,8 +205,8 @@ async def auto_tag_all_songs(mode: str = "existing"):
 
 
 @router.get("/listWithTags", summary="获取带标签的歌曲列表")
-async def song_list_with_tags(q: str = "", page: int = 1):
-    result = await views.get_list_with_tags(q, page)
+async def song_list_with_tags(q: str = "", page: int = 1, tag_id: int = None, sort_by_tag: bool = False):
+    result = await views.get_list_with_tags(q, page, tag_id, sort_by_tag)
     return result
 
 # SSE功能对应的消息格式为 {"code": 0, "data": 1}

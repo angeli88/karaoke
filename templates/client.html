@@ -17,6 +17,14 @@
     <div class="search-section" id="search-section" style="display: none;">
       <div class="search-container">
         <input id="search-text" type="text" placeholder="请输入歌曲或歌手名字">
+        <div style="position: relative; margin-top: 0.5rem; display: none;">
+          <select id="tag-filter-client" onchange="loadSongList(1, document.getElementById('search-text').value, false)">
+            <option value="">筛选标签</option>
+          </select>
+          <div style="position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-secondary);">
+            <svg width="12" height="12" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M831.872 340.864L512 652.672 192.128 340.864a30.72 30.72 0 0 0-45.44 41.472l342.4 334.4a30.72 30.72 0 0 0 45.952 0l342.4-334.4a30.72 30.72 0 0 0-45.568-41.472z"></path></svg>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -27,7 +35,92 @@
         <div class="section-header">
           <h3>点歌</h3>
         </div>
-        <div class="song-container"></div>
+        
+        <!-- 分类导航 -->
+        <div class="categories-container">
+          <div class="category-item" onclick="showSection('tag-list')">
+            <div class="category-icon">
+              <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                <path fill="currentColor" d="M512 512a192 192 0 1 0 0-384 192 192 0 0 0 0 384zm0 64a256 256 0 0 0-256 256v32h512v-32a256 256 0 0 0-256-256z"></path>
+              </svg>
+            </div>
+            <span>歌手</span>
+          </div>
+          <!-- 可以根据需要添加更多分类，如“排行榜”、“分类”等 -->
+        </div>
+
+        <!-- Tab 切换栏 -->
+        <div class="tabs-container">
+          <div class="tab-item active" onclick="switchTab('usually')">我的常唱</div>
+          <div class="tab-item" onclick="switchTab('all')">全部歌曲</div>
+          <div class="tab-slider"></div>
+        </div>
+
+        <div id="usually-section">
+          <div class="usually-container"></div>
+        </div>
+
+        <div id="all-songs-section" style="display: none;">
+          <div class="song-container"></div>
+        </div>
+
+        <div id="search-results-section" style="display: none;">
+          <div class="section-title">搜索结果</div>
+          <div class="search-container-results"></div>
+        </div>
+      </div>
+
+      <!-- 标签/歌手列表区域 -->
+      <div class="content-section" id="tag-list">
+        <div class="section-header">
+          <button class="back-btn" onclick="showSection('song-selection')">
+            <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="20" height="20"><path fill="currentColor" d="M685.248 104.704a32 32 0 0 1 0 45.248L377.344 457.856l307.904 307.904a32 32 0 1 1-45.248 45.248L309.632 480.448a32 32 0 0 1 0-45.248L640 104.704a32 32 0 0 1 45.248 0z"></path></svg>
+          </button>
+          <h3>歌手列表</h3>
+        </div>
+        <!-- 字母筛选栏 -->
+        <div class="initials-bar">
+          <div class="initial-item active" onclick="filterByInitial('')">热门</div>
+          <div class="initial-item" onclick="filterByInitial('A')">A</div>
+          <div class="initial-item" onclick="filterByInitial('B')">B</div>
+          <div class="initial-item" onclick="filterByInitial('C')">C</div>
+          <div class="initial-item" onclick="filterByInitial('D')">D</div>
+          <div class="initial-item" onclick="filterByInitial('E')">E</div>
+          <div class="initial-item" onclick="filterByInitial('F')">F</div>
+          <div class="initial-item" onclick="filterByInitial('G')">G</div>
+          <div class="initial-item" onclick="filterByInitial('H')">H</div>
+          <div class="initial-item" onclick="filterByInitial('I')">I</div>
+          <div class="initial-item" onclick="filterByInitial('J')">J</div>
+          <div class="initial-item" onclick="filterByInitial('K')">K</div>
+          <div class="initial-item" onclick="filterByInitial('L')">L</div>
+          <div class="initial-item" onclick="filterByInitial('M')">M</div>
+          <div class="initial-item" onclick="filterByInitial('N')">N</div>
+          <div class="initial-item" onclick="filterByInitial('O')">O</div>
+          <div class="initial-item" onclick="filterByInitial('P')">P</div>
+          <div class="initial-item" onclick="filterByInitial('Q')">Q</div>
+          <div class="initial-item" onclick="filterByInitial('R')">R</div>
+          <div class="initial-item" onclick="filterByInitial('S')">S</div>
+          <div class="initial-item" onclick="filterByInitial('T')">T</div>
+          <div class="initial-item" onclick="filterByInitial('U')">U</div>
+          <div class="initial-item" onclick="filterByInitial('V')">V</div>
+          <div class="initial-item" onclick="filterByInitial('W')">W</div>
+          <div class="initial-item" onclick="filterByInitial('X')">X</div>
+          <div class="initial-item" onclick="filterByInitial('Y')">Y</div>
+          <div class="initial-item" onclick="filterByInitial('Z')">Z</div>
+          <div class="initial-item" onclick="filterByInitial('OTHER')">其他</div>
+        </div>
+        <div class="tag-items-container"></div>
+      </div>
+
+      <!-- 标签歌曲列表区域 -->
+      <div class="content-section" id="tag-songs">
+        <div class="section-header">
+          <button class="back-btn" onclick="showSection('tag-list')">
+            <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="20" height="20"><path fill="currentColor" d="M685.248 104.704a32 32 0 0 1 0 45.248L377.344 457.856l307.904 307.904a32 32 0 1 1-45.248 45.248L309.632 480.448a32 32 0 0 1 0-45.248L640 104.704a32 32 0 0 1 45.248 0z"></path></svg>
+          </button>
+          <h3 id="current-tag-name">歌曲</h3>
+        </div>
+        <div class="tag-songs-container"></div>
       </div>
       
       <!-- 遥控区域 -->

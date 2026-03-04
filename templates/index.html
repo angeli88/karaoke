@@ -30,6 +30,9 @@
             <a href="#" id="auto-tag">自动打标签</a>
             <a href="{{ prefix }}/song" target="_blank">控制台(已点<span id="addSongs">0</span>)</a>
             <a href="#" id="batch-delete" style="display: none;">批量删除</a>
+            <select id="tag-filter" onchange="get_song_list(1)" style="margin-left: 10px; height: 30px; border-radius: 4px; border: 1px solid #ccc; max-width: 120px;">
+                <option value="">筛选标签</option>
+            </select>
         </div>
     </div>
     <div class="content-area">
@@ -38,7 +41,7 @@
                 <tr>
                     <th><input type="checkbox" id="select-all"></th>
                     <th>名称</th>
-                    <th>标签</th>
+                    <th id="tag-header" style="cursor: pointer; color: #007bff;" onclick="toggle_tag_sort()">标签 <span id="sort-icon">↕</span></th>
                     <!-- <th id="create-time">创建时间</th> -->
                     <th>操作</th>
                 </tr>

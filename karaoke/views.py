@@ -10,8 +10,10 @@ import uuid
 import subprocess
 import traceback
 import csv
-from typing import List, Dict
+import collections
+from typing import List, Dict, Optional
 from urllib.parse import unquote
+from pypinyin import lazy_pinyin
 from tortoise.exceptions import DoesNotExist
 from audio_separator.separator import Separator
 from karaoke.results import Result
@@ -578,28 +580,48 @@ async def rename_song(file_id: int, new_name: str) -> Result:
 
 
 # 标签相关API函数
-async def get_all_tags(page: int = 1, q: str = "") -> Result:
+async def get_all_tags(page: int = 1, q: str = "", initial: str = "") -> Result:
     result = Result()
     try:
+        query = SongTag.all().order_by('name')
+        if q:
+            query = query.filter(name__icontains=q)
+        
+        tags = await query
+        
+        tag_list = [SongTagResponse.from_orm_format(tag).dict() for tag in tags]
+        
+        # 为每个标签添加拼音首字母
+        for tag in tag_list:
+            pinyin = lazy_pinyin(tag['name'])
+            if pinyin:
+                tag['initial'] = pinyin[0][0].upper()
+            else:
+                tag['initial'] = '#'
+
+        # 按首字母筛选
+        if initial:
+            initial = initial.upper()
+            if initial == 'OTHER':
+                tag_list = [t for t in tag_list if not t['initial'].isalpha()]
+            else:
+                tag_list = [t for t in tag_list if t['initial'] == initial]
+
+        # 分页处理
+        total_num = len(tag_list)
         if page > 0:
-            query = SongTag.all().order_by('name')
-            if q:
-                query = query.filter(name__icontains=q)
-            
-            total_num = await query.count()
-            tags = await query.offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
-            
+            start = (page - 1) * PAGE_SIZE
+            end = start + PAGE_SIZE
+            result.data = tag_list[start:end]
             result.totalPage = (total_num + PAGE_SIZE - 1) // PAGE_SIZE
             result.page = page
             result.total = total_num
         else:
-            query = SongTag.all().order_by('name')
-            if q:
-                query = query.filter(name__icontains=q)
-            tags = await query
-        
-        tag_list = [SongTagResponse.from_orm_format(tag) for tag in tags]
-        result.data = tag_list
+            result.data = tag_list
+            result.total = total_num
+            result.totalPage = 1
+            result.page = 1
+            
         result.msg = "获取标签列表成功"
         logger.info(result.msg)
     except:
@@ -733,25 +755,97 @@ async def remove_song_tag(song_id: int, tag_id: int) -> Result:
     return result
 
 
-async def get_list_with_tags(q: str, page: int) -> Result:
+async def get_list_with_tags(q: str, page: int, tag_id: int = None, sort_by_tag: bool = False) -> Result:
     result = Result()
     try:
+        # 1. 基础查询
+        query = Files.all()
         if q:
-            files = await Files.filter(name__icontains=q).order_by('-id').offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
-            total_num = await Files.filter(name__icontains=q).count()
+            query = query.filter(name__icontains=q)
+        
+        # 2. 标签筛选
+        if tag_id:
+            song_ids = await SongTagRelation.filter(tag_id=tag_id).values_list('song_id', flat=True)
+            query = query.filter(id__in=song_ids)
+        
+        # 3. 排序和分页
+        if sort_by_tag:
+            # 如果需要按照标签排序，我们需要获取所有符合筛选条件的歌曲
+            # 为了效率，我们批量获取所有关系和标签
+            all_files = await query.all()
+            if not all_files:
+                result.data = []
+                result.page = page
+                result.total = 0
+                result.totalPage = 0
+                return result
+                
+            all_file_ids = [f.id for f in all_files]
+            
+            # 批量获取关联
+            all_relations = await SongTagRelation.filter(song_id__in=all_file_ids).all()
+            tag_ids = list(set(r.tag_id for r in all_relations))
+            
+            # 批量获取标签
+            all_tags = await SongTag.filter(id__in=tag_ids).all()
+            tag_map = {tag.id: tag for tag in all_tags}
+            
+            # 建立歌曲ID到标签列表的映射
+            song_tag_map = collections.defaultdict(list)
+            for r in all_relations:
+                tag_obj = tag_map.get(r.tag_id)
+                if tag_obj:
+                    song_tag_map[r.song_id].append(tag_obj)
+            
+            # 转换为带标签的对象列表
+            all_file_list = []
+            for f in all_files:
+                tags = song_tag_map[f.id]
+                # 按照标签名称内部排序
+                tags.sort(key=lambda t: t.name)
+                
+                c = f.create_time.strftime("%Y-%m-%d %H:%M:%S")
+                m = f.update_time.strftime("%Y-%m-%d %H:%M:%S")
+                tag_list = [SongTagResponse.from_orm_format(t) for t in tags]
+                
+                all_file_list.append({
+                    "id": f.id,
+                    "name": f.name,
+                    "is_sing": f.is_sing,
+                    "create_time": c,
+                    "update_time": m,
+                    "tags": tag_list
+                })
+            
+            # 按照第一个标签的名称排序，没有标签的排在最后
+            # 考虑到可能有多个标签，这里取第一个
+            all_file_list.sort(key=lambda x: (x['tags'][0]['name'] if x['tags'] else 'zzzzzzzz'))
+            
+            total_num = len(all_file_list)
+            result.totalPage = (total_num + PAGE_SIZE - 1) // PAGE_SIZE
+            result.page = page
+            result.total = total_num
+            
+            # 手动分页
+            start = (page - 1) * PAGE_SIZE
+            end = start + PAGE_SIZE
+            result.data = all_file_list[start:end]
+            
         else:
-            files = await Files.all().order_by('-id').offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
-            total_num = await Files.all().count()
-        
-        file_list = []
-        for f in files:
-            file_with_tags = await FileListWithTags.from_orm_format(f)
-            file_list.append(file_with_tags.dict())
-        
-        result.data = file_list
-        result.page = page
-        result.total = len(result.data)
-        result.totalPage = (total_num + PAGE_SIZE - 1) // PAGE_SIZE
+            # 普通排序（按ID倒序，即最新添加排在最前）
+            total_num = await query.count()
+            files = await query.order_by('-id').offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
+            
+            file_list = []
+            for f in files:
+                file_with_tags = await FileListWithTags.from_orm_format(f)
+                file_list.append(file_with_tags.dict())
+            
+            result.data = file_list
+            result.page = page
+            result.total = len(result.data)
+            result.totalPage = (total_num + PAGE_SIZE - 1) // PAGE_SIZE
+            
         logger.info("查询带标签的歌曲列表成功 ~")
     except:
         logger.error(traceback.format_exc())

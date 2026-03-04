@@ -54,54 +54,146 @@ let currentPage = 1;
 let isLoading = false;
 let hasMoreSongs = true;
 let isSearchMode = false;
+let currentTab = 'usually'; // 'usually' or 'all'
 
 // 加载曲库列表
 function loadSongList(page = 1, keyword = '', append = false) {
     if (isLoading) return;
     isLoading = true;
     
-    let url = server + "/song/list?page=" + page;
-    if (keyword) {
-        url += "&q=" + encodeURIComponent(keyword);
+    let tagId = document.getElementById("tag-filter-client") ? document.getElementById("tag-filter-client").value : "";
+    
+    // 如果有搜索或标签筛选，显示搜索结果区域，隐藏 Tab 和常唱/全部
+    if (keyword || tagId) {
+        document.getElementById("usually-section").style.display = "none";
+        document.getElementById("all-songs-section").style.display = "none";
+        document.querySelector(".tabs-container").style.display = "none";
+        document.getElementById("search-results-section").style.display = "block";
+        
+        let url = server + "/song/list?page=" + page;
+        if (keyword) url += "&q=" + encodeURIComponent(keyword);
+        if (tagId) url += "&tag_id=" + tagId;
+        
+        $.ajax({
+            type: "GET",
+            url: url,
+            success: function (data) {
+                isLoading = false;
+                if (data.code === 0) {
+                    let s = renderSongList(data.data, append ? ((page - 1) * 20 + 1) : 1);
+                    if (append) {
+                        document.getElementsByClassName("search-container-results")[0].innerHTML += s;
+                    } else {
+                        document.getElementsByClassName("search-container-results")[0].innerHTML = s;
+                    }
+                    hasMoreSongs = page < data.totalPage;
+                    currentPage = page;
+                }
+            },
+            error: () => { isLoading = false; }
+        });
+        return;
     }
     
-    $.ajax({
-        type: "GET",
-        url: url,
-        success: function (data) {
-            isLoading = false;
-            if (data.code === 0) {
-                let s = "";
-                data.data.forEach((item, index) => {
-                    let displayIndex = append ? ((page - 1) * 20 + index + 1) : (index + 1);
-                    s += `<div class="song-list"><div>${displayIndex}. ${item.name}</div><a class="song-list-btn" onclick="sing_song(${item.id})">点歌</a></div>`;
-                });
-                
-                if (append) {
-                    document.getElementsByClassName("song-container")[0].innerHTML += s;
-                } else {
-                    document.getElementsByClassName("song-container")[0].innerHTML = s;
+    // 无搜索状态，显示 Tab 切换
+    document.querySelector(".tabs-container").style.display = "flex";
+    document.getElementById("search-results-section").style.display = "none";
+    
+    if (currentTab === 'usually') {
+        document.getElementById("usually-section").style.display = "block";
+        document.getElementById("all-songs-section").style.display = "none";
+        loadUsuallyList();
+        isLoading = false;
+        hasMoreSongs = false; // 常唱暂不支持分页
+    } else {
+        document.getElementById("usually-section").style.display = "none";
+        document.getElementById("all-songs-section").style.display = "block";
+        
+        $.ajax({
+            type: "GET",
+            url: server + "/song/list?page=" + page,
+            success: function (data) {
+                isLoading = false;
+                if (data.code === 0) {
+                    let s = renderSongList(data.data, append ? ((page - 1) * 20 + 1) : 1);
+                    if (append) {
+                        document.getElementsByClassName("song-container")[0].innerHTML += s;
+                    } else {
+                        document.getElementsByClassName("song-container")[0].innerHTML = s;
+                    }
+                    hasMoreSongs = page < data.totalPage;
+                    currentPage = page;
                 }
-                
-                // 更新分页状态
-                hasMoreSongs = page < data.totalPage;
-                console.log(hasMoreSongs);
-                currentPage = page;
-                
-                // 如果内容不足以产生滚动条，且还有更多数据，自动加载下一页
-                const scrollContainer = document.getElementById("song-selection");
-                if (scrollContainer && hasMoreSongs && scrollContainer.scrollHeight <= scrollContainer.clientHeight + 1) {
-                     loadSongList(currentPage + 1, keyword, true);
-                }
-            } else {
-                console.log(data.msg);
-            }
-        },
-        error: function() {
-            isLoading = false;
-            console.log("加载歌曲列表失败");
+            },
+            error: () => { isLoading = false; }
+        });
+    }
+}
+
+// 统一渲染歌曲列表 HTML
+function renderSongList(songs, startIndex) {
+    let s = "";
+    songs.forEach((item, index) => {
+        let tagsHtml = '';
+        if (item.tags && item.tags.length > 0) {
+            item.tags.forEach(tag => {
+                tagsHtml += `<span style="display: inline-block; padding: 2px 6px; border-radius: 4px; background: ${tag.color}; color: white; font-size: 10px; margin-left: 5px;">${tag.name}</span>`;
+            });
+        }
+        s += `<div class="song-list"><div>${startIndex + index}. ${item.name}${tagsHtml}</div><a class="song-list-btn" onclick="sing_song(${item.id})">点歌</a></div>`;
+    });
+    return s;
+}
+
+// 切换 Tab
+function switchTab(tab) {
+    currentTab = tab;
+    // 更新 UI
+    const tabItems = document.querySelectorAll('.tab-item');
+    tabItems.forEach(item => {
+        if (item.innerText === (tab === 'usually' ? '我的常唱' : '全部歌曲')) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
         }
     });
+    
+    currentPage = 1;
+    hasMoreSongs = true;
+    loadSongList(1);
+}
+
+// 加载“我的常唱”列表
+function loadUsuallyList() {
+    $.ajax({
+        type: "GET",
+        url: server + "/song/singHistory/usually",
+        success: function (data) {
+            if (data.code === 0) {
+                document.getElementsByClassName("usually-container")[0].innerHTML = renderSongList(data.data, 1);
+            }
+        }
+    });
+}
+
+// 切换标签筛选显示
+function toggleTagFilter() {
+    let searchInput = document.getElementById("search-text");
+    let filterContainer = document.getElementById("tag-filter-client").parentElement;
+    
+    if (filterContainer.style.display === 'none' || filterContainer.style.display === '') {
+        filterContainer.style.display = 'block';
+        // 如果开启筛选，则清空关键词搜索
+        if (searchInput.value) {
+            searchInput.value = '';
+            loadSongList(1);
+        }
+    } else {
+        filterContainer.style.display = 'none';
+        // 如果关闭筛选，则重置筛选并显示常唱
+        document.getElementById("tag-filter-client").value = "";
+        loadSongList(1);
+    }
 }
 
 // 搜索功能
@@ -109,7 +201,9 @@ document.getElementById("search-text").addEventListener('input', () =>{
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
         let keyWord = document.getElementById("search-text").value;
-        if (keyWord === undefined || keyWord === '') {
+        let tagId = document.getElementById("tag-filter-client") ? document.getElementById("tag-filter-client").value : "";
+        
+        if ((keyWord === undefined || keyWord === '') && !tagId) {
             // 清空搜索，显示完整曲库
             isSearchMode = false;
             currentPage = 1;
@@ -120,7 +214,7 @@ document.getElementById("search-text").addEventListener('input', () =>{
         // 搜索模式
         isSearchMode = true;
         currentPage = 1;
-        hasMoreSongs = true; // 搜索结果不支持翻页
+        hasMoreSongs = true;
         loadSongList(1, keyWord);
     }, 500);
 });
@@ -351,7 +445,29 @@ function delete_from_list(file_id) {
     })
 }
 
-window.onload = function() {
+function load_tags_for_filter_client() {
+    $.ajax({
+        type: "GET",
+        url: server + "/song/tags?page=0",
+        success: function (data) {
+            if (data.code === 0) {
+                let select = document.getElementById('tag-filter-client');
+                if (select) {
+                    let html = '<option value="">筛选标签</option>';
+                    // 按照标签名称进行排序，优化中文排序
+                    data.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+                    data.data.forEach(tag => {
+                        html += `<option value="${tag.id}">${tag.name}</option>`;
+                    });
+                    select.innerHTML = html;
+                }
+            }
+        }
+    });
+}
+
+window.onload = () => {
+    load_tags_for_filter_client();
     const eventSource = new EventSource(server + "/song/events");
     eventSource.onmessage = function(event) {
         const message = JSON.parse(event.data);
@@ -428,18 +544,91 @@ function showSection(sectionId) {
     const searchSection = document.getElementById('search-section');
     if (sectionId === 'song-selection') {
         searchSection.style.display = 'block';
-        // 初始化曲库列表（如果还没有加载过）
-        const songContainer = document.getElementsByClassName("song-container")[0];
-        if (songContainer && songContainer.innerHTML.trim() === '') {
-            currentPage = 1;
-            hasMoreSongs = true;
-            isSearchMode = false;
-            loadSongList(1);
-            setupScrollLoading();
-        }
+        load_tags_for_filter_client(); // 每次切换回点歌页面时刷新标签列表
+        
+        // 每次切换回点歌页面都重新加载（以显示最新的常唱歌曲或搜索结果）
+        currentPage = 1;
+        hasMoreSongs = true;
+        let keyWord = document.getElementById("search-text").value;
+        loadSongList(1, keyWord);
+        setupScrollLoading();
+    } else if (sectionId === 'tag-list') {
+        searchSection.style.display = 'none';
+        loadFullTagList();
+    } else if (sectionId === 'tag-songs') {
+        searchSection.style.display = 'none';
     } else {
         searchSection.style.display = 'none';
     }
+}
+
+// 加载完整的标签列表页面
+function loadFullTagList(initial = '') {
+    let url = server + "/song/tags?page=0";
+    if (initial) {
+        url += "&initial=" + initial;
+    }
+    $.ajax({
+        type: "GET",
+        url: url,
+        success: function (data) {
+            if (data.code === 0) {
+                let s = "";
+                // 排序已经在后端或此处通过 localeCompare 确保
+                data.data.forEach(tag => {
+                    s += `
+                        <div class="tag-item-row" onclick="showTagSongs(${tag.id}, '${tag.name.replace(/'/g, "\\'")}')">
+                            <div class="tag-item-left">
+                                <div class="tag-item-avatar" style="background: ${tag.color}">${tag.name[0]}</div>
+                                <div class="tag-item-name">${tag.name}</div>
+                            </div>
+                            <div class="tag-item-arrow">
+                                <svg viewBox="0 0 1024 1024" width="20" height="20"><path fill="currentColor" d="M338.752 104.704a32 32 0 0 0 0 45.248L646.656 457.856 338.752 765.76a32 32 0 1 0 45.248 45.248l330.368-330.368a32 32 0 0 0 0-45.248L384 104.704a32 32 0 0 0-45.248 0z"></path></svg>
+                            </div>
+                        </div>
+                    `;
+                });
+                document.getElementsByClassName("tag-items-container")[0].innerHTML = s;
+            }
+        }
+    });
+}
+
+// 字母筛选
+function filterByInitial(initial) {
+    // 更新 UI 状态
+    const items = document.querySelectorAll('.initial-item');
+    items.forEach(item => {
+        if (item.innerText === (initial === '' ? '热门' : (initial === 'OTHER' ? '其他' : initial))) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+    
+    loadFullTagList(initial);
+}
+
+// 展示特定标签下的歌曲
+function showTagSongs(tagId, tagName) {
+    document.getElementById("current-tag-name").innerText = tagName;
+    showSection('tag-songs');
+    
+    $.ajax({
+        type: "GET",
+        url: server + "/song/list?page=1&tag_id=" + tagId,
+        success: function (data) {
+            if (data.code === 0) {
+                let s = "";
+                // 按歌曲名称排序
+                data.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+                data.data.forEach((item, index) => {
+                    s += `<div class="song-list"><div>${index + 1}. ${item.name}</div><a class="song-list-btn" onclick="sing_song(${item.id})">点歌</a></div>`;
+                });
+                document.getElementsByClassName("tag-songs-container")[0].innerHTML = s;
+            }
+        }
+    });
 }
 
 // 更新歌曲数量显示

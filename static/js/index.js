@@ -1,6 +1,31 @@
 const server = localStorage.getItem("server");
 let songListTimeout = null;
 let currentPage = 1; // 记录当前页面
+function load_tags_for_filter() {
+    $.ajax({
+        type: "GET",
+        url: server + "/song/tags?page=0", // 获取所有标签（page=0 表示不分页）
+        success: function (data) {
+            if (data.code === 0) {
+                let select = document.getElementById('tag-filter');
+                if (select) {
+                    let html = '<option value="">筛选标签</option>';
+                    // 按照标签名称进行排序，优化中文排序
+                    data.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+                    data.data.forEach(tag => {
+                        html += `<option value="${tag.id}">${tag.name}</option>`;
+                    });
+                    select.innerHTML = html;
+                }
+            }
+        }
+    });
+}
+
+$(document).ready(function() {
+    load_tags_for_filter();
+});
+
 document.getElementById("file-upload").addEventListener('click', () => {
     let fileUpload_input = document.getElementById("file-input");
     fileUpload_input.click();
@@ -184,6 +209,8 @@ function get_all_tags_list(page = 1, search = "") {
                     document.getElementsByTagName("tbody")[0].innerHTML = '';
                     // 即使没有标签，也应该显示创建行
                 } else {
+                    // 按照标签名称进行排序，优化中文排序
+                    data.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
                     data.data.forEach(item => {
                         s = s + `<tr>
                                 <td><span class="song-tag" style="background-color: ${item.color};">${item.name}</span></td>
@@ -279,6 +306,7 @@ function delete_tag_confirm(tag_id, tag_name) {
             success: function (data) {
                 if (data.code === 0) {
                     $.Toast(data.msg, "success");
+                    load_tags_for_filter(); // 更新筛选下拉框
                     get_all_tags_list(currentPage);
                 } else {
                     $.Toast(data.msg, "error");
@@ -334,6 +362,7 @@ function update_tag_submit(tag_id) {
             if (data.code === 0) {
                 $.Toast(data.msg, "success");
                 close_edit_tag_dialog();
+                load_tags_for_filter(); // 更新筛选下拉框
                 get_all_tags_list(currentPage);
             } else {
                 $.Toast(data.msg, "error");
@@ -357,6 +386,7 @@ function create_new_tag_global() {
         success: function (data) {
             if (data.code === 0) {
                 $.Toast(data.msg, "success");
+                load_tags_for_filter(); // 更新筛选下拉框
                 get_all_tags_list(currentPage);
             } else {
                 $.Toast(data.msg, "error");
@@ -365,13 +395,29 @@ function create_new_tag_global() {
     });
 }
 
+let isTagSorted = false;
+
+function toggle_tag_sort() {
+    isTagSorted = !isTagSorted;
+    get_song_list(1);
+}
+
 function get_song_list(page=1) {
     currentPage = page; // 更新当前页面
     let q = document.getElementById("file-search").value;
+    let tagId = document.getElementById("tag-filter") ? document.getElementById("tag-filter").value : "";
+    
     let params = "page=" + page;
     if (q && q !== "" && q !== null) {
-        params = params + "&q=" + q;
+        params = params + "&q=" + encodeURIComponent(q);
     }
+    if (tagId) {
+        params = params + "&tag_id=" + tagId;
+    }
+    if (isTagSorted) {
+        params = params + "&sort_by_tag=true";
+    }
+    
     $.ajax({
         type: "GET",
         url: server + "/song/listWithTags?" + params,
@@ -383,7 +429,7 @@ function get_song_list(page=1) {
                 thead.innerHTML = `
                     <th><input type="checkbox" id="select-all"></th>
                     <th>名称</th>
-                    <th>标签</th>
+                    <th id="tag-header" style="cursor: pointer; color: #007bff;" onclick="toggle_tag_sort()">标签 <span id="sort-icon">${isTagSorted ? '↓' : '↕'}</span></th>
                     <th>操作</th>
                 `;
 
@@ -615,6 +661,10 @@ function manage_tags(song_id, song_name, page = 1, search = "") {
                     url: server + "/song/tags?page=" + page + "&q=" + encodeURIComponent(search),
                     success: function (allTagsData) {
                         if (allTagsData.code === 0) {
+                            // 按照标签名称进行排序，优化中文排序
+                            allTagsData.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+                            song_tags.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+                            
                             // 如果是搜索或第一页，且有已选标签，我们需要确保已选标签在展示时有特殊处理
                             // 但由于 API 分页限制，我们可能无法在所有页面都展示所有已选标签
                             // 这里采用逻辑：在展示列表中，如果标签已选，则勾选；
@@ -772,6 +822,7 @@ function create_new_tag(song_id, song_name) {
             if (data.code === 0) {
                 $.Toast(data.msg, "success");
                 close_tag_dialog();
+                load_tags_for_filter(); // 更新筛选下拉框
                 get_song_list(currentPage); // 重新获取歌曲列表
                 manage_tags(song_id, song_name); // 重新打开标签管理对话框
             } else {
