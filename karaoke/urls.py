@@ -199,8 +199,8 @@ async def remove_song_tag(song_id: int, tag_id: int):
 
 
 @router.post("/tags/auto", summary="根据歌曲名称自动添加标签")
-async def auto_tag_all_songs():
-    result = await views.auto_tag_all_songs()
+async def auto_tag_all_songs(mode: str = "existing"):
+    result = await views.auto_tag_all_songs(mode)
     return result
 
 

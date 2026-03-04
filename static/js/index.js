@@ -91,11 +91,46 @@ document.getElementById("generate_code").addEventListener('click', () => {
 })
 
 document.getElementById("auto-tag").addEventListener('click', () => {
-    if (confirm("确定要根据曲库所有歌曲名称自动添加标签吗？这可能需要一些时间。")) {
+    show_auto_tag_options();
+})
+
+function show_auto_tag_options() {
+    let dialogHtml = `
+        <div id="auto-tag-dialog" class="tag-dialog-overlay">
+            <div class="tag-dialog-content">
+                <h3>选择自动打标签方式</h3>
+                <div style="margin: 20px 0; display: flex; flex-direction: column; gap: 10px;">
+                    <button onclick="run_auto_tag('existing')" class="tag-dialog-btn tag-dialog-btn-primary" style="width: 100%; text-align: left; padding: 15px;">
+                        <strong>方式一：基于已有标签</strong><br>
+                        <small>仅根据目前已创建的标签匹配歌曲，找不到则打上“其他”</small>
+                    </button>
+                    <button onclick="run_auto_tag('csv')" class="tag-dialog-btn tag-dialog-btn-primary" style="width: 100%; text-align: left; padding: 15px;">
+                        <strong>方式二：基于 SENDER.CSV</strong><br>
+                        <small>根据 SENDER.CSV (或 singer_.csv) 中的歌手名单匹配歌曲</small>
+                    </button>
+                </div>
+                <div class="dialog-footer">
+                    <button onclick="close_auto_tag_dialog()" class="tag-dialog-btn tag-dialog-btn-secondary">取消</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', dialogHtml);
+}
+
+function close_auto_tag_dialog() {
+    let dialog = document.getElementById('auto-tag-dialog');
+    if (dialog) dialog.remove();
+}
+
+function run_auto_tag(mode) {
+    close_auto_tag_dialog();
+    let msg = mode === 'existing' ? "确定要根据已有标签自动添加标签吗？" : "确定要根据 SENDER.CSV 自动添加标签吗？";
+    if (confirm(msg + "这可能需要一些时间。")) {
         show_modal_cover();
         $.ajax({
             type: "POST",
-            url: server + "/song/tags/auto",
+            url: server + "/song/tags/auto?mode=" + mode,
             success: function (data) {
                 close_modal_cover();
                 if (data.code === 0) {
@@ -111,26 +146,30 @@ document.getElementById("auto-tag").addEventListener('click', () => {
             }
         });
     }
-})
+}
+
 
 document.getElementById("manage-all-tags").addEventListener('click', () => {
     get_all_tags_list(1);
 })
 
-function get_all_tags_list(page = 1) {
+let currentTagSearch = "";
+
+function get_all_tags_list(page = 1, search = "") {
     currentPage = page;
+    currentTagSearch = search;
+    
+    let url = server + "/song/tags?page=" + page;
+    if (search) {
+        url += "&q=" + encodeURIComponent(search);
+    }
+    
     $.ajax({
         type: "GET",
-        url: server + "/song/tags?page=" + page,
+        url: url,
         success: function (data) {
             let s = '';
             if (data.code === 0) {
-                if (data.total === 0) {
-                    $.Toast("没有标签", "error");
-                    document.getElementsByTagName("tbody")[0].innerHTML = '';
-                    return;
-                }
-                
                 // 修改表头以适应标签管理
                 let thead = document.querySelector("thead tr");
                 thead.innerHTML = `
@@ -140,37 +179,97 @@ function get_all_tags_list(page = 1) {
                     <th>操作</th>
                 `;
 
-                data.data.forEach(item => {
-                    s = s + `<tr>
-                            <td><span class="song-tag" style="background-color: ${item.color};">${item.name}</span></td>
-                            <td>${item.color}</td>
-                            <td>${item.create_time}</td>
-                            <td>
-                                <a onclick="edit_tag(${item.id}, '${item.name}', '${item.color}')" title="编辑">编辑</a>
-                                <a onclick="delete_tag_confirm(${item.id}, '${item.name}')" title="删除">删除</a>
-                            </td></tr>`;
-                })
+                if (data.total === 0 && !search) {
+                    $.Toast("没有标签", "error");
+                    document.getElementsByTagName("tbody")[0].innerHTML = '';
+                    // 即使没有标签，也应该显示创建行
+                } else {
+                    data.data.forEach(item => {
+                        s = s + `<tr>
+                                <td><span class="song-tag" style="background-color: ${item.color};">${item.name}</span></td>
+                                <td>${item.color}</td>
+                                <td>${item.create_time}</td>
+                                <td>
+                                    <a onclick="edit_tag(${item.id}, '${item.name}', '${item.color}')" title="编辑">编辑</a>
+                                    <a onclick="delete_tag_confirm(${item.id}, '${item.name}')" title="删除">删除</a>
+                                </td></tr>`;
+                    })
+                }
                 
-                PagingManage($('#paging'), data.totalPage, data.page, 'get_all_tags_list');
+                // 处理分页
+                if (search) {
+                    // 如果有搜索，PagingManage 需要特殊处理或者我们自己调用带参数的函数
+                    // 这里为了简单，我们暂时重写 PagingManage 的回调
+                    // 但由于 PagingManage 是封装好的，我们可能需要修改全局函数名引用的方式
+                    // 或者更简单：在 PagingManage 生成的 HTML 中，把 onclick 替换掉
+                    PagingManage($('#paging'), data.totalPage, data.page, 'get_all_tags_list_wrapper');
+                } else {
+                    PagingManage($('#paging'), data.totalPage, data.page, 'get_all_tags_list');
+                }
+                
                 document.getElementsByTagName("table")[0].style.display = "";
                 document.getElementsByTagName("tbody")[0].innerHTML = s;
                 document.getElementById("batch-delete").style.display = "none";
                 
-                // 添加“创建新标签”行到 tbody 底部或作为单独区域
-                let createRow = `
-                    <tr class="create-tag-row">
-                        <td colspan="2"><input type="text" id="new-tag-name-global" placeholder="新标签名称" style="width: 80%;"></td>
-                        <td><input type="color" id="new-tag-color-global" value="#007bff" style="width: 50px; height: 30px;"></td>
-                        <td><button onclick="create_new_tag_global()" class="tag-dialog-btn tag-dialog-btn-primary">创建</button></td>
+                // 添加“搜索”和“创建新标签”行到 tbody 顶部
+                let controlRow = `
+                    <tr class="control-tag-row" style="background: #f8f9fa;">
+                        <td colspan="4">
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px;">
+                                <div style="display: flex; gap: 10px; align-items: center; flex: 1;">
+                                    <input type="text" id="tag-search-input" placeholder="搜索标签..." value="${search}" style="width: 200px; height: 30px;">
+                                    <button onclick="search_tags()" class="tag-dialog-btn tag-dialog-btn-secondary">搜索</button>
+                                    ${search ? '<button onclick="clear_tag_search()" class="tag-dialog-btn tag-dialog-btn-secondary">清除</button>' : ''}
+                                </div>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <input type="text" id="new-tag-name-global" placeholder="新标签名称" style="width: 150px; height: 30px;">
+                                    <input type="color" id="new-tag-color-global" value="#007bff" style="width: 40px; height: 30px;">
+                                    <button onclick="create_new_tag_global()" class="tag-dialog-btn tag-dialog-btn-primary">创建</button>
+                                </div>
+                            </div>
+                        </td>
                     </tr>
                 `;
-                document.getElementsByTagName("tbody")[0].insertAdjacentHTML('afterbegin', createRow);
+                document.getElementsByTagName("tbody")[0].insertAdjacentHTML('afterbegin', controlRow);
+                
+                // 绑定回车搜索事件
+                let searchInput = document.getElementById("tag-search-input");
+                if (searchInput) {
+                    searchInput.addEventListener("keypress", function(event) {
+                        if (event.key === "Enter") {
+                            search_tags();
+                        }
+                    });
+                    // 聚焦到搜索框，防止输入丢失
+                    if (search) {
+                         searchInput.focus();
+                         // 将光标移到末尾
+                         let val = searchInput.value;
+                         searchInput.value = '';
+                         searchInput.value = val;
+                    }
+                }
             } else {
                 $.Toast(data.msg, 'error');
             }
         }
     })
 }
+
+// 包装函数，用于分页回调带搜索参数
+function get_all_tags_list_wrapper(page) {
+    get_all_tags_list(page, currentTagSearch);
+}
+
+function search_tags() {
+    let keyword = document.getElementById("tag-search-input").value.trim();
+    get_all_tags_list(1, keyword);
+}
+
+function clear_tag_search() {
+    get_all_tags_list(1, "");
+}
+
 
 function delete_tag_confirm(tag_id, tag_name) {
     if (confirm(`确定要删除标签 "${tag_name}" 吗？此操作将同时从所有歌曲中移除该标签。`)) {

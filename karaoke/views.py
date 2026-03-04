@@ -760,83 +760,120 @@ async def get_list_with_tags(q: str, page: int) -> Result:
     return result
 
 
-async def auto_tag_all_songs() -> Result:
+async def auto_tag_all_songs(mode: str = "existing") -> Result:
     result = Result()
     try:
-        # 1. 获取数据库中所有已存在的标签
-        existing_tags = await SongTag.all()
-        tag_dict = {tag.name.lower(): tag for tag in existing_tags}
-        
-        # 2. 从 CSV 加载歌手信息
-        csv_file_path = "/Users/li/Code/github/karaoke/static/file/singer_.csv"
-        csv_singers = []
-        if os.path.exists(csv_file_path):
-            with open(csv_file_path, 'r', encoding='utf-8') as f:
-                reader = csv.reader(f)
-                for row in reader:
-                    if len(row) >= 2:
-                        singer_name = row[1].strip()
-                        if singer_name:
-                            csv_singers.append(singer_name)
-        
-        # 3. 合并数据库标签名和 CSV 歌手名
-        # 将 CSV 歌手也作为潜在标签名，且去重
-        all_potential_tag_names = set(tag_dict.keys())
-        for s in csv_singers:
-            all_potential_tag_names.add(s.lower())
-        
         # 获取所有歌曲
         songs = await Files.all()
         if not songs:
             result.code = 1
             result.msg = "曲库中没有歌曲"
             return result
-        
+
         count = 0
         tag_count = 0
-        
-        # 预加载所有歌曲的标签关系，避免在循环中频繁查询
-        # 但考虑到歌曲数量和标签关系数量，可能需要根据实际情况权衡
-        # 这里为了逻辑清晰，采用更稳妥的方式
-        
-        for song in songs:
-            song_updated = False
-            # 对于每一首歌曲，检查是否包含任何歌手名
-            for singer_name_lower in all_potential_tag_names:
-                # 模糊匹配：歌曲名称是否包含歌手名称
-                if singer_name_lower in song.name.lower():
-                    # 匹配成功，准备打标签
-                    # 首先确定标签对应的真实名称（优先用数据库里的，其次用 CSV 里的）
-                    tag_name = ""
-                    if singer_name_lower in tag_dict:
-                        tag_obj = tag_dict[singer_name_lower]
-                        tag_name = tag_obj.name
-                    else:
-                        # 从 CSV 歌手列表中找回原始大小写的名称
-                        # 这里简单处理，取第一个匹配到的
-                        for s in csv_singers:
-                            if s.lower() == singer_name_lower:
-                                tag_name = s
-                                break
-                        
-                        # 如果数据库里没有该标签，先创建
-                        if tag_name:
-                            tag_obj = await SongTag.create(name=tag_name, color='#007bff')
-                            tag_dict[singer_name_lower] = tag_obj
-                        else:
-                            continue # 不太可能发生
 
-                    # 检查关联是否已存在
-                    existing_relation = await SongTagRelation.filter(song_id=song.id, tag_id=tag_obj.id).first()
-                    if not existing_relation:
-                        await SongTagRelation.create(song_id=song.id, tag_id=tag_obj.id)
-                        tag_count += 1
-                        song_updated = True
+        if mode == "existing":
+            # 1. 获取数据库中所有已存在的标签
+            existing_tags = await SongTag.all()
+            tag_dict = {tag.name.lower(): tag for tag in existing_tags if tag.name != "其他"}
             
-            if song_updated:
-                count += 1
+            # 确保 "其他" 标签存在
+            other_tag = await SongTag.filter(name="其他").first()
+            if not other_tag:
+                other_tag = await SongTag.create(name="其他", color="#6c757d")
+            
+            for song in songs:
+                song_updated = False
+                matched = False
+                # 对于每一首歌曲，检查是否包含任何现有标签
+                for tag_name_lower, tag_obj in tag_dict.items():
+                    if tag_name_lower in song.name.lower():
+                        # 检查关联是否已存在
+                        existing_relation = await SongTagRelation.filter(song_id=song.id, tag_id=tag_obj.id).first()
+                        if not existing_relation:
+                            await SongTagRelation.create(song_id=song.id, tag_id=tag_obj.id)
+                            tag_count += 1
+                            song_updated = True
+                        matched = True
+                
+                # 如果没有任何标签匹配，则打上 "其他"
+                if not matched:
+                    # 额外检查：如果该歌曲已经手动设置了除了“其他”之外的标签，则不再打“其他”
+                    # 先获取该歌曲所有的标签ID
+                    song_existing_tag_relations = await SongTagRelation.filter(song_id=song.id).all()
+                    song_existing_tag_ids = [r.tag_id for r in song_existing_tag_relations]
+                    
+                    # 检查这些标签ID中是否包含非“其他”标签
+                    has_real_tag = False
+                    if song_existing_tag_ids:
+                        # 排除掉“其他”标签的ID，看是否还有剩余
+                        real_tags_count = await SongTag.filter(id__in=song_existing_tag_ids).exclude(name="其他").count()
+                        if real_tags_count > 0:
+                            has_real_tag = True
+                    
+                    if not has_real_tag:
+                        existing_relation = await SongTagRelation.filter(song_id=song.id, tag_id=other_tag.id).first()
+                        if not existing_relation:
+                            await SongTagRelation.create(song_id=song.id, tag_id=other_tag.id)
+                            tag_count += 1
+                            song_updated = True
+                
+                if song_updated:
+                    count += 1
+            
+            result.msg = f"基于已有标签打标签完成。共遍历 {len(songs)} 首歌曲，为 {count} 首歌曲添加了 {tag_count} 个标签。"
+
+        elif mode == "csv":
+            # 2. 从 SENDER.CSV 加载歌手信息 (优先) 或 singer_.csv
+            csv_file_path = "/Users/li/Code/github/karaoke/static/file/SENDER.CSV"
+            if not os.path.exists(csv_file_path):
+                csv_file_path = "/Users/li/Code/github/karaoke/static/file/singer_.csv"
+            
+            csv_singers = []
+            if os.path.exists(csv_file_path):
+                with open(csv_file_path, 'r', encoding='utf-8') as f:
+                    reader = csv.reader(f)
+                    for row in reader:
+                        if len(row) >= 2:
+                            singer_name = row[1].strip()
+                            if singer_name:
+                                csv_singers.append(singer_name)
+            
+            if not csv_singers:
+                result.code = 1
+                result.msg = "CSV文件为空或不存在"
+                return result
+
+            # 获取所有现有标签以便重用
+            existing_tags = await SongTag.all()
+            tag_dict = {tag.name.lower(): tag for tag in existing_tags}
+
+            for song in songs:
+                song_updated = False
+                # 对于每一首歌曲，检查是否包含 CSV 中的歌手名
+                for singer_name in csv_singers:
+                    singer_name_lower = singer_name.lower()
+                    if singer_name_lower in song.name.lower():
+                        # 获取或创建标签
+                        if singer_name_lower in tag_dict:
+                            tag_obj = tag_dict[singer_name_lower]
+                        else:
+                            tag_obj = await SongTag.create(name=singer_name, color='#007bff')
+                            tag_dict[singer_name_lower] = tag_obj
+                        
+                        # 检查关联是否已存在
+                        existing_relation = await SongTagRelation.filter(song_id=song.id, tag_id=tag_obj.id).first()
+                        if not existing_relation:
+                            await SongTagRelation.create(song_id=song.id, tag_id=tag_obj.id)
+                            tag_count += 1
+                            song_updated = True
+                
+                if song_updated:
+                    count += 1
+            
+            result.msg = f"基于 CSV 文件打标签完成。共遍历 {len(songs)} 首歌曲，为 {count} 首歌曲添加了 {tag_count} 个标签。"
         
-        result.msg = f"自动打标签完成。共遍历 {len(songs)} 首歌曲，为 {count} 首歌曲添加了 {tag_count} 个标签。"
         logger.info(result.msg)
     except:
         logger.error(traceback.format_exc())
