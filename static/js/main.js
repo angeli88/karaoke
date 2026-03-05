@@ -57,6 +57,12 @@ let isSearchMode = false;
 let currentTab = 'usually'; // 'usually' or 'all'
 let currentInitial = ''; // 记录标签页当前的拼音筛选
 
+// 标签歌曲分页变量
+let currentTagSongsPage = 1;
+let hasMoreTagSongs = true;
+let currentTagSongsId = null;
+let currentTagSongsName = '';
+
 // 加载曲库列表
 function loadSongList(page = 1, keyword = '', append = false) {
     if (isLoading) return;
@@ -625,23 +631,64 @@ function filterByInitial(initial) {
 }
 
 // 展示特定标签下的歌曲
-function showTagSongs(tagId, tagName) {
+function showTagSongs(tagId, tagName, page = 1, append = false) {
+    currentTagSongsId = tagId;
+    currentTagSongsName = tagName;
+    currentTagSongsPage = page;
+    
     document.getElementById("current-tag-name").innerText = tagName;
-    showSection('tag-songs');
+    if (!append) {
+        showSection('tag-songs');
+        document.getElementsByClassName("tag-songs-container")[0].innerHTML = "";
+    }
+    
+    if (isLoading) return;
+    isLoading = true;
     
     $.ajax({
         type: "GET",
-        url: server + "/song/list?page=1&tag_id=" + tagId,
+        url: server + "/song/list?page=" + page + "&tag_id=" + tagId,
         success: function (data) {
+            isLoading = false;
             if (data.code === 0) {
-                let s = "";
-                // 按歌曲名称排序
+                // 按歌曲名称排序 (如果后端没排，前端排一下，但分页情况下前端只能排单页)
                 data.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
-                data.data.forEach((item, index) => {
-                    s += `<div class="song-list"><div>${index + 1}. ${item.name}</div><a class="song-list-btn" onclick="sing_song(${item.id})">点歌</a></div>`;
-                });
-                document.getElementsByClassName("tag-songs-container")[0].innerHTML = s;
+                
+                let s = renderSongList(data.data, (page - 1) * 20 + 1);
+                
+                if (append) {
+                    document.getElementsByClassName("tag-songs-container")[0].innerHTML += s;
+                } else {
+                    document.getElementsByClassName("tag-songs-container")[0].innerHTML = s;
+                    // 只有在非 append 模式下才重置滚动位置
+                    document.getElementById('tag-songs').scrollTop = 0;
+                }
+                
+                hasMoreTagSongs = page < data.totalPage;
+                setupTagSongsScrollLoading();
             }
+        },
+        error: () => { isLoading = false; }
+    });
+}
+
+// 标签歌曲滚动加载
+function setupTagSongsScrollLoading() {
+    const scrollContainer = document.getElementById("tag-songs");
+    if (!scrollContainer) return;
+    
+    if (scrollContainer.dataset.scrollAttached) return;
+    scrollContainer.dataset.scrollAttached = "true";
+    
+    scrollContainer.addEventListener('scroll', () => {
+        if (isLoading || !hasMoreTagSongs) return;
+        
+        const scrollTop = scrollContainer.scrollTop;
+        const scrollHeight = scrollContainer.scrollHeight;
+        const clientHeight = scrollContainer.clientHeight;
+        
+        if (scrollTop + clientHeight >= scrollHeight - 100) {
+            showTagSongs(currentTagSongsId, currentTagSongsName, currentTagSongsPage + 1, true);
         }
     });
 }
