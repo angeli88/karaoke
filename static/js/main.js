@@ -55,6 +55,7 @@ let isLoading = false;
 let hasMoreSongs = true;
 let isSearchMode = false;
 let currentTab = 'usually'; // 'usually' or 'all'
+let currentInitial = ''; // 记录标签页当前的拼音筛选
 
 // 加载曲库列表
 function loadSongList(page = 1, keyword = '', append = false) {
@@ -446,21 +447,23 @@ function delete_from_list(file_id) {
 }
 
 function load_tags_for_filter_client() {
+    let select = document.getElementById('tag-filter-client');
+    if (!select) return;
+    
+    let currentTagId = select.value;
+    
     $.ajax({
         type: "GET",
         url: server + "/song/tags?page=0",
         success: function (data) {
             if (data.code === 0) {
-                let select = document.getElementById('tag-filter-client');
-                if (select) {
-                    let html = '<option value="">筛选标签</option>';
-                    // 按照标签名称进行排序，优化中文排序
-                    data.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
-                    data.data.forEach(tag => {
-                        html += `<option value="${tag.id}">${tag.name}</option>`;
-                    });
-                    select.innerHTML = html;
-                }
+                let html = '<option value="">筛选标签</option>';
+                // 按照标签名称进行排序，优化中文排序
+                data.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+                data.data.forEach(tag => {
+                    html += `<option value="${tag.id}" ${tag.id == currentTagId ? 'selected' : ''}>${tag.name}</option>`;
+                });
+                select.innerHTML = html;
             }
         }
     });
@@ -554,7 +557,18 @@ function showSection(sectionId) {
         setupScrollLoading();
     } else if (sectionId === 'tag-list') {
         searchSection.style.display = 'none';
-        loadFullTagList();
+        loadFullTagList(currentInitial);
+        // 延迟一丁点确保 DOM 已完全可见并能正确应用样式
+        setTimeout(() => {
+            const items = document.querySelectorAll('#tag-list .initial-item');
+            items.forEach(item => {
+                if (item.getAttribute('onclick').includes(`'${currentInitial}'`)) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }, 50);
     } else if (sectionId === 'tag-songs') {
         searchSection.style.display = 'none';
     } else {
@@ -596,10 +610,11 @@ function loadFullTagList(initial = '') {
 
 // 字母筛选
 function filterByInitial(initial) {
+    currentInitial = initial;
     // 更新 UI 状态
-    const items = document.querySelectorAll('.initial-item');
+    const items = document.querySelectorAll('#tag-list .initial-item');
     items.forEach(item => {
-        if (item.innerText === (initial === '' ? '热门' : (initial === 'OTHER' ? '其他' : initial))) {
+        if (item.getAttribute('onclick').includes(`'${initial}'`)) {
             item.classList.add('active');
         } else {
             item.classList.remove('active');
